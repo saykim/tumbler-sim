@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🥁 Tumbler Mixing Simulator Pro</title>
+
+    <!-- Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <style>
+      :root {
+        --primary: #3b82f6;
+        --primary-hover: #2563eb;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --dark: #0f172a;
+        --panel-bg: #1e293b;
+        --card-bg: #334155;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Inter", -apple-system, system-ui, sans-serif;
+        background: var(--dark);
+        color: var(--text-main);
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+      }
+
+      /* Layout */
+      .sidebar {
+        width: 320px;
+        background: var(--panel-bg);
+        border-right: 1px solid #ffffff10;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 20px;
+      }
+
+      .main-content {
+        flex: 1;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .right-panel {
+        width: 360px;
+        background: var(--panel-bg);
+        border-left: 1px solid #ffffff10;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      /* UI Elements */
+      h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        color: var(--primary);
+      }
+      h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--text-main);
+      }
+
+      .control-group {
+        background: var(--card-bg);
+        padding: 16px;
+        border-radius: 12px;
+        margin-bottom: 16px;
+      }
+      .control-group h3 {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .control-row {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .control-row:last-child {
+        margin-bottom: 0;
+      }
+      .label-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8125rem;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        cursor: pointer;
+      }
+      select,
+      input[type="text"],
+      input[type="number"] {
+        background: var(--dark);
+        border: 1px solid #ffffff20;
+        color: white;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 0.8125rem;
+      }
+
+      .btn {
+        border: none;
+        padding: 10px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: white;
+      }
+      .btn-primary:hover {
+        background: var(--primary-hover);
+      }
+      .btn-success {
+        background: var(--success);
+        color: white;
+      }
+      .btn-danger {
+        background: var(--danger);
+        color: white;
+      }
+      .btn-ghost {
+        background: transparent;
+        border: 1px solid #ffffff20;
+        color: white;
+      }
+      .btn-ghost:hover {
+        background: #ffffff10;
+      }
+
+      .btn-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      /* Canvas Overlay */
+      .canvas-container {
+        flex: 1;
+        background: #000;
+        position: relative;
+      }
+      #sim-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .stats-overlay {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        display: flex;
+        gap: 12px;
+        pointer-events: none;
+      }
+      .stat-badge {
+        background: #000000a0;
+        backdrop-filter: blur(8px);
+        padding: 6px 12px;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        border: 1px solid #ffffff10;
+      }
+
+      /* Metrics Display */
+      .metric-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .metric-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 8px;
+      }
+      .metric-title {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+      .metric-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+      .metric-unit {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-left: 4px;
+      }
+
+      .progress-bar {
+        height: 6px;
+        background: #ffffff10;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%;
+        background: var(--primary);
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .chart-container {
+        height: 200px;
+        margin-top: 20px;
+      }
+
+      /* Comprehensive Score Card */
+      .comprehensive-score {
+        background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 16px;
+        border: 1px solid #ffffff15;
+      }
+      .comprehensive-score .score-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 8px;
+      }
+      .comprehensive-score .score-value {
+        font-size: 3rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .grade-badge {
+        display: inline-block;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        margin-top: 8px;
+      }
+      .grade-s {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        color: #1a1a1a;
+      }
+      .grade-a {
+        background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+        color: #1a1a1a;
+      }
+      .grade-b {
+        background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+        color: white;
+      }
+      .grade-c {
+        background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+        color: white;
+      }
+      .grade-d {
+        background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+        color: white;
+      }
+
+      /* Help Button */
+      .help-btn {
+        background: transparent;
+        border: 1px solid #ffffff30;
+        color: var(--text-muted);
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        font-size: 0.75rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 8px;
+        transition: all 0.2s;
+      }
+      .help-btn:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+      }
+
+      /* Modal Styles */
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.85);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 20px;
+        backdrop-filter: blur(4px);
+      }
+      .modal-overlay.active {
+        display: flex;
+      }
+      .modal-content {
+        background: var(--panel-bg);
+        border-radius: 16px;
+        max-width: 600px;
+        width: 100%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        border: 1px solid #ffffff15;
+      }
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid #ffffff15;
+        position: sticky;
+        top: 0;
+        background: var(--panel-bg);
+      }
+      .modal-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+      }
+      .modal-close {
+        background: var(--card-bg);
+        border: none;
+        color: var(--text-muted);
+        font-size: 1.5rem;
+        cursor: pointer;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+      .modal-close:hover {
+        background: var(--danger);
+        color: white;
+      }
+      .modal-body {
+        padding: 20px;
+      }
+      .help-section {
+        margin-bottom: 20px;
+      }
+      .help-section h3 {
+        font-size: 1rem;
+        color: var(--primary);
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #ffffff10;
+      }
+      .help-item {
+        background: var(--card-bg);
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 10px;
+        border-left: 3px solid var(--primary);
+      }
+      .help-item h4 {
+        font-size: 0.875rem;
+        color: var(--text-main);
+        margin-bottom: 6px;
+      }
+      .help-item p {
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+      .help-item.flip {
+        border-left-color: var(--success);
+      }
+      .help-item.radial {
+        border-left-color: var(--warning);
+      }
+      .help-item.comprehensive {
+        border-left-color: #60a5fa;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Left Sidebar: Controls -->
+    <aside class="sidebar">
+      <h1>
+        Tumbler Sim Pro <button class="help-btn" id="btn-help-params">?</button>
+      </h1>
+
+      <div class="control-group">
+        <h3>Drum Settings</h3>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Radius (px)</span><span id="v-drum-radius">250</span>
+          </div>
+          <input
+            type="range"
+            id="drum-radius"
+            min="150"
+            max="350"
+            value="250"
+          />
+        </div>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Rotation (RPM)</span><span id="v-drum-rpm">15</span>
+          </div>
+          <input type="range" id="drum-rpm" min="-60" max="60" value="15" />
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Baffle Settings</h3>
+        <div class="control-row">
+          <div class="label-row"><span>Pattern</span></div>
+          <select id="baffle-pattern">
+            <option value="uniform">Uniform</option>
+            <option value="alternating">Alternating</option>
+            <option value="clustered">Clustered</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Count</span><span id="v-baffle-count">4</span>
+          </div>
+          <input type="range" id="baffle-count" min="0" max="12" value="4" />
+        </div>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Length (px)</span><span id="v-baffle-length">60</span>
+          </div>
+          <input
+            type="range"
+            id="baffle-length"
+            min="20"
+            max="150"
+            value="60"
+          />
+        </div>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Tilt Angle (°)</span><span id="v-baffle-tilt">15</span>
+          </div>
+          <input type="range" id="baffle-tilt" min="-90" max="90" value="15" />
+        </div>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Thickness (px)</span><span id="v-baffle-thickness">12</span>
+          </div>
+          <input
+            type="range"
+            id="baffle-thickness"
+            min="4"
+            max="30"
+            value="12"
+          />
+        </div>
+        <div class="control-row">
+          <div class="label-row"><span>Shape</span></div>
+          <select id="baffle-shape">
+            <option value="rectangle">Rectangle (둥근 끝)</option>
+            <option value="dome">Dome (언덕형)</option>
+            <option value="triangle">Triangle (삼각형)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Particle Settings</h3>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Count</span><span id="v-particle-count">150</span>
+          </div>
+          <input
+            type="range"
+            id="particle-count"
+            min="20"
+            max="500"
+            value="150"
+          />
+        </div>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Size</span><span id="v-particle-size">18</span>
+          </div>
+          <input type="range" id="particle-size" min="8" max="40" value="18" />
+        </div>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Friction</span><span id="v-particle-friction">0.3</span>
+          </div>
+          <input
+            type="range"
+            id="particle-friction"
+            min="0"
+            max="100"
+            value="30"
+          />
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Physics Settings</h3>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Gravity Scale</span><span id="v-gravity-scale">1.0</span>
+          </div>
+          <input
+            type="range"
+            id="gravity-scale"
+            min="20"
+            max="200"
+            value="100"
+          />
+        </div>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Restitution (Bounce)</span><span id="v-restitution">0.2</span>
+          </div>
+          <input type="range" id="restitution" min="0" max="100" value="20" />
+        </div>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Air Friction</span><span id="v-air-friction">0.01</span>
+          </div>
+          <input type="range" id="air-friction" min="0" max="50" value="1" />
+        </div>
+        <div class="control-row">
+          <div class="label-row">
+            <span>Physics Quality</span><span id="v-iterations">8</span>
+          </div>
+          <input type="range" id="iterations" min="4" max="16" value="8" />
+        </div>
+        <div class="control-row">
+          <div class="label-row"><span>Particle Shape</span></div>
+          <select id="particle-shape">
+            <option value="rectangle">Rectangle (Nugget)</option>
+            <option value="circle">Circle</option>
+            <option value="polygon">Polygon (6-sided)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Environment</h3>
+        <div class="control-row">
+          <div class="label-row"><span>Random Seed</span></div>
+          <input
+            type="number"
+            id="random-seed"
+            value="42"
+            style="width: 100%"
+          />
+        </div>
+        <div class="btn-grid">
+          <button class="btn btn-primary" id="btn-rebuild">
+            Reset & Build
+          </button>
+          <button class="btn btn-ghost" id="btn-pause">Pause</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center: Simulation -->
+    <main class="main-content">
+      <div class="canvas-container" id="canvas-wrap">
+        <div class="stats-overlay">
+          <div class="stat-badge" id="fps-counter">FPS: 0</div>
+          <div class="stat-badge" id="sim-time">00:00</div>
+        </div>
+        <canvas id="sim-canvas"></canvas>
+      </div>
+    </main>
+
+    <!-- Right Panel: Analytics -->
+    <aside class="right-panel">
+      <h2>
+        Live Analytics <button class="help-btn" id="btn-help-scores">?</button>
+      </h2>
+
+      <!-- Comprehensive Score Card -->
+      <div class="comprehensive-score">
+        <div class="score-label">📊 COMPREHENSIVE SCORE</div>
+        <div class="score-value" id="m-comprehensive">0</div>
+        <div class="grade-badge grade-d" id="grade-badge">Grade D</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">MIXING INDEX (Angular)</span>
+          <div>
+            <span class="metric-value" id="m-overall">0</span
+            ><span class="metric-unit">%</span>
+          </div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="pb-overall" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">FLIP RATE (Recent)</span>
+          <div>
+            <span class="metric-value" id="m-flip">0.0</span
+            ><span class="metric-unit">flips/min</span>
+          </div>
+        </div>
+        <div class="progress-bar">
+          <div
+            class="progress-fill"
+            id="pb-flip"
+            style="width: 0%; background: var(--success)"
+          ></div>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">RADIAL UNIFORMITY</span>
+          <div>
+            <span class="metric-value" id="m-radial">0</span
+            ><span class="metric-unit">%</span>
+          </div>
+        </div>
+        <div class="progress-bar">
+          <div
+            class="progress-fill"
+            id="pb-radial"
+            style="width: 0%; background: var(--warning)"
+          ></div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <canvas id="history-chart"></canvas>
+      </div>
+
+      <div class="btn-grid" style="margin-top: 24px">
+        <button class="btn btn-ghost" id="btn-save-preset">Save Preset</button>
+        <button class="btn btn-ghost" id="btn-load-preset">Load Preset</button>
+        <button class="btn btn-ghost" id="btn-export">Export CSV</button>
+      </div>
+      <input type="file" id="load-file" style="display: none" accept=".json" />
+    </aside>
+
+    <!-- Score Help Modal -->
+    <div class="modal-overlay" id="modal-scores">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span class="modal-title">📊 스코어 설명</span>
+          <button class="modal-close" id="close-scores">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="help-section">
+            <h3>종합 점수 (Comprehensive Score)</h3>
+            <div class="help-item comprehensive">
+              <h4>📊 종합 점수란?</h4>
+              <p>
+                모든 지표를 가중 평균하여 계산한 단일 점수입니다. 높을수록
+                혼합이 잘 되고 있음을 의미합니다.
+              </p>
+              <p>
+                <strong>계산 공식:</strong> (Mixing Index × 40%) + (Flip Rate
+                점수 × 35%) + (Radial Uniformity × 25%)
+              </p>
+            </div>
+            <div class="help-item">
+              <h4>🏆 등급 기준</h4>
+              <p>
+                <strong>S급 (90+):</strong> 완벽한 혼합 상태<br />
+                <strong>A급 (75-89):</strong> 매우 좋은 혼합<br />
+                <strong>B급 (60-74):</strong> 양호한 혼합<br />
+                <strong>C급 (40-59):</strong> 개선 필요<br />
+                <strong>D급 (0-39):</strong> 혼합 안됨
+              </p>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>개별 지표</h3>
+            <div class="help-item">
+              <h4>🔵 Mixing Index (각도 기반 혼합도)</h4>
+              <p>
+                드럼을 8개 구역으로 나눠 각 구역에서 A/B 입자 비율이 50:50에
+                가까운지 측정합니다. 100%면 완벽하게 섞인 상태입니다.
+              </p>
+              <p>
+                <strong>비유:</strong> 치킨 양념이 모든 부위에 골고루 묻었는지
+                확인하는 것과 같습니다.
+              </p>
+            </div>
+            <div class="help-item flip">
+              <h4>🟢 Flip Rate (뒤집힘 빈도)</h4>
+              <p>
+                입자가 얼마나 자주 뒤집히는지 측정합니다. 높을수록 입자들이
+                활발하게 움직이고 있음을 의미합니다.
+              </p>
+              <p><strong>단위:</strong> flips/min (분당 뒤집힘 횟수)</p>
+              <p>
+                <strong>비유:</strong> 프라이팬에서 재료가 얼마나 자주
+                뒤집어지는지 관찰하는 것입니다.
+              </p>
+            </div>
+            <div class="help-item radial">
+              <h4>🟠 Radial Uniformity (반경 균일도)</h4>
+              <p>
+                중심부와 벽 근처에 A/B 입자가 균일하게 분포하는지 측정합니다.
+                100%면 모든 영역에 골고루 퍼진 상태입니다.
+              </p>
+              <p>
+                <strong>비유:</strong> 양념이 치킨 바깥쪽에만 묻지 않고 안쪽까지
+                잘 스며들었는지 확인하는 것입니다.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Parameter Help Modal -->
+    <div class="modal-overlay" id="modal-params">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span class="modal-title">⚙️ 파라미터 설명</span>
+          <button class="modal-close" id="close-params">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="help-section">
+            <h3>🥁 드럼 설정</h3>
+            <div class="help-item">
+              <h4>Radius (반지름)</h4>
+              <p>
+                드럼의 크기를 조절합니다. 크면 더 많은 입자를 담을 수 있지만
+                혼합 효율이 달라질 수 있습니다.
+              </p>
+            </div>
+            <div class="help-item">
+              <h4>Rotation (회전 속도, RPM)</h4>
+              <p>
+                분당 회전 수입니다. 높으면 빠르게 회전하고, 음수면 반대 방향으로
+                회전합니다.
+              </p>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>🔩 배플 설정</h3>
+            <div class="help-item">
+              <h4>Pattern (패턴)</h4>
+              <p>
+                <strong>Uniform:</strong> 균일하게 배치<br />
+                <strong>Alternating:</strong> 기울기 교대 배치<br />
+                <strong>Clustered:</strong> 그룹으로 모아 배치
+              </p>
+            </div>
+            <div class="help-item">
+              <h4>Count / Length / Tilt</h4>
+              <p>
+                배플 개수, 길이, 기울기 각도입니다. 배플은 입자를 뒤집어주는
+                역할을 합니다.
+              </p>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>⚪ 입자 설정</h3>
+            <div class="help-item">
+              <h4>Count (개수)</h4>
+              <p>
+                시뮬레이션할 입자 수입니다. 많을수록 현실적이지만 성능이
+                저하됩니다.
+              </p>
+            </div>
+            <div class="help-item">
+              <h4>Size / Friction</h4>
+              <p>
+                입자 크기와 마찰 계수입니다. 마찰이 높으면 잘 미끄러지지
+                않습니다.
+              </p>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>⚛️ 물리 설정</h3>
+            <div class="help-item">
+              <h4>Gravity Scale (중력 배율)</h4>
+              <p>중력의 세기입니다. 2.0이면 2배 중력, 0.5면 절반 중력입니다.</p>
+            </div>
+            <div class="help-item">
+              <h4>Restitution (반발력)</h4>
+              <p>
+                충돌 시 튕기는 정도입니다. 1.0이면 완전 탄성 충돌(공처럼
+                튀김)입니다.
+              </p>
+            </div>
+            <div class="help-item">
+              <h4>Air Friction (공기 저항)</h4>
+              <p>공기 저항 계수입니다. 높으면 입자가 더 빨리 감속합니다.</p>
+            </div>
+            <div class="help-item">
+              <h4>Physics Quality (물리 정밀도)</h4>
+              <p>충돌 계산 반복 횟수입니다. 높으면 정확하지만 느려집니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /**
+       * ═══════════════════════════════════════════════════════════════════════
+       * CORE SIMULATOR CLASS
+       * ═══════════════════════════════════════════════════════════════════════
+       */
+      class TumblerSim {
+        constructor() {
+          this.setupMatter();
+          this.setupState();
+          this.bindEvents();
+          this.initCharts();
+          this.loop();
+        }
+
+        setupMatter() {
+          this.engine = Matter.Engine.create({
+            enableSleeping: false,
+            positionIterations: this.config?.physics?.iterations || 8,
+            velocityIterations: this.config?.physics?.iterations || 8,
+            constraintIterations: 4,
+          });
+
+          this.canvas = document.getElementById("sim-canvas");
+          this.render = Matter.Render.create({
+            canvas: this.canvas,
+            engine: this.engine,
+            options: {
+              width: 800,
+              height: 800,
+              wireframes: false,
+              background: "transparent",
+            },
+          });
+
+          this.runner = Matter.Runner.create();
+        }
+
+        setupState() {
+          this.config = {
+            drum: { radius: 250, rpm: 15 },
+            baffles: {
+              count: 4,
+              length: 60,
+              width: 8,
+              tilt: 15,
+              pattern: "uniform",
+            },
+            particles: {
+              count: 150,
+              size: 18,
+              friction: 0.3,
+              shape: "rectangle",
+            },
+            physics: {
+              gravityScale: 1.0,
+              restitution: 0.2,
+              airFriction: 0.01,
+              iterations: 8,
+            },
+            seed: 42,
+          };
+
+          this.state = {
+            isPaused: false,
+            drumAngle: 0,
+            drumCenter: { x: 400, y: 400 },
+            particles: [],
+            drumComposite: null,
+            startTime: Date.now(),
+            frameCount: 0,
+            lastFpsUpdate: Date.now(),
+            flipTracker: new Map(), // id -> { lastAngle, cumRot, flips, history }
+          };
+
+          this.metrics = {
+            history: [],
+            maxPoints: 60,
+          };
+        }
+
+        // Seedable random number generator
+        mulberry32(a) {
+          return function () {
+            var t = (a += 0x6d2b79f5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        build() {
+          const { world } = this.engine;
+          Matter.Composite.clear(world, false);
+
+          // Set Seed
+          const seed =
+            parseInt(document.getElementById("random-seed").value) || 42;
+          this.random = this.mulberry32(seed);
+
+          // Update Config from UI
+          this.config.drum.radius = parseInt(
+            document.getElementById("drum-radius").value
+          );
+          this.config.drum.rpm = parseInt(
+            document.getElementById("drum-rpm").value
+          );
+          this.config.baffles.count = parseInt(
+            document.getElementById("baffle-count").value
+          );
+          this.config.baffles.length = parseInt(
+            document.getElementById("baffle-length").value
+          );
+          this.config.baffles.tilt = parseInt(
+            document.getElementById("baffle-tilt").value
+          );
+          this.config.baffles.pattern =
+            document.getElementById("baffle-pattern").value;
+          this.config.baffles.width = parseInt(
+            document.getElementById("baffle-thickness").value
+          );
+          this.config.baffles.shape =
+            document.getElementById("baffle-shape").value;
+          this.config.particles.count = parseInt(
+            document.getElementById("particle-count").value
+          );
+          this.config.particles.size = parseInt(
+            document.getElementById("particle-size").value
+          );
+          this.config.particles.friction =
+            parseInt(document.getElementById("particle-friction").value) / 100;
+          this.config.particles.shape =
+            document.getElementById("particle-shape").value;
+
+          // Physics settings
+          this.config.physics.gravityScale =
+            parseInt(document.getElementById("gravity-scale").value) / 100;
+          this.config.physics.restitution =
+            parseInt(document.getElementById("restitution").value) / 100;
+          this.config.physics.airFriction =
+            parseInt(document.getElementById("air-friction").value) / 100;
+          this.config.physics.iterations = parseInt(
+            document.getElementById("iterations").value
+          );
+
+          // Apply gravity scale
+          this.engine.world.gravity.y = 1 * this.config.physics.gravityScale;
+
+          // Update physics iterations
+          this.engine.positionIterations = this.config.physics.iterations;
+          this.engine.velocityIterations = this.config.physics.iterations;
+
+          // Create Drum
+          const segments = 64;
+          const r = this.config.drum.radius;
+          const thickness = 15;
+          const drumWalls = [];
+
+          for (let i = 0; i < segments; i++) {
+            const angle = (i / segments) * Math.PI * 2;
+            const nextAngle = ((i + 1) / segments) * Math.PI * 2;
+            const midAngle = (angle + nextAngle) / 2;
+            const len = 2 * r * Math.sin(Math.PI / segments) + 2;
+
+            const x = this.state.drumCenter.x + Math.cos(midAngle) * r;
+            const y = this.state.drumCenter.y + Math.sin(midAngle) * r;
+
+            const wall = Matter.Bodies.rectangle(x, y, len, thickness, {
+              isStatic: true,
+              angle: midAngle + Math.PI / 2,
+              render: { fillStyle: "#475569" },
+              friction: 1.0,
+            });
+            drumWalls.push(wall);
+          }
+
+          // Create Baffles
+          const baffles = this.createBaffles();
+          this.state.drumComposite = Matter.Composite.create({
+            bodies: [...drumWalls, ...baffles],
+          });
+          Matter.Composite.add(world, this.state.drumComposite);
+
+          // Create Particles
+          this.state.particles = [];
+          this.state.flipTracker.clear();
+
+          const pCount = this.config.particles.count;
+          const pSize = this.config.particles.size;
+          const innerR = r - this.config.baffles.length - 20;
+
+          for (let i = 0; i < pCount; i++) {
+            const angle = this.random() * Math.PI * 2;
+            const dist = this.random() * innerR * 0.9;
+            const x = this.state.drumCenter.x + Math.cos(angle) * dist;
+            const y = this.state.drumCenter.y + Math.sin(angle) * dist;
+
+            const isA = i < pCount / 2;
+            const variation = 0.8 + this.random() * 0.4;
+
+            const p = this.createParticle(
+              x,
+              y,
+              pSize,
+              variation,
+              isA,
+              this.config.particles.shape
+            );
+
+            this.state.particles.push(p);
+            this.state.flipTracker.set(p.id, {
+              lastAngle: p.angle,
+              cumRot: 0,
+              flips: 0,
+              history: [],
+            });
+          }
+          Matter.Composite.add(world, this.state.particles);
+
+          // Reset clock
+          this.state.startTime = Date.now();
+          this.state.drumAngle = 0;
+          this.metrics.history = [];
+        }
+
+        createBaffles() {
+          const { count, length, width, tilt, pattern, shape } =
+            this.config.baffles;
+          const r = this.config.drum.radius;
+          const baffles = [];
+          const tiltRad = (tilt * Math.PI) / 180;
+
+          for (let i = 0; i < count; i++) {
+            let angle = (i / count) * Math.PI * 2;
+            let currentTilt = tiltRad;
+
+            if (pattern === "alternating") {
+              currentTilt = i % 2 === 0 ? tiltRad : -tiltRad;
+            } else if (pattern === "clustered") {
+              const clusterSize = 2;
+              const clusterIdx = Math.floor(i / clusterSize);
+              const intraIdx = i % clusterSize;
+              angle =
+                (clusterIdx / (count / clusterSize)) * Math.PI * 2 +
+                intraIdx * 0.2;
+            }
+
+            const baffleR = r - length / 2;
+            const x = this.state.drumCenter.x + Math.cos(angle) * baffleR;
+            const y = this.state.drumCenter.y + Math.sin(angle) * baffleR;
+            const baffleAngle = angle + Math.PI / 2 + currentTilt;
+
+            let b;
+            const renderStyle = { fillStyle: "#e11d48" };
+
+            switch (shape) {
+              case "dome":
+                // Dome shape - trapezoid that's wider at base, narrower at top
+                const domeVertices = [
+                  { x: -width * 0.8, y: length / 2 }, // bottom-left (wide)
+                  { x: width * 0.8, y: length / 2 }, // bottom-right (wide)
+                  { x: width * 0.3, y: -length / 2 }, // top-right (narrow)
+                  { x: -width * 0.3, y: -length / 2 }, // top-left (narrow)
+                ];
+                b = Matter.Bodies.fromVertices(x, y, [domeVertices], {
+                  isStatic: true,
+                  render: renderStyle,
+                  friction: 1.0,
+                });
+                if (b) Matter.Body.setAngle(b, baffleAngle);
+                break;
+
+              case "triangle":
+                // Triangle shape pointing outward
+                b = Matter.Bodies.polygon(x, y, 3, length * 0.6, {
+                  isStatic: true,
+                  angle: baffleAngle,
+                  render: renderStyle,
+                  friction: 1.0,
+                });
+                break;
+
+              case "rectangle":
+              default:
+                // Rectangle with rounded ends
+                b = Matter.Bodies.rectangle(x, y, width, length, {
+                  isStatic: true,
+                  angle: baffleAngle,
+                  chamfer: { radius: Math.min(width, length) * 0.3 },
+                  render: renderStyle,
+                  friction: 1.0,
+                });
+                break;
+            }
+
+            if (b) baffles.push(b);
+          }
+          return baffles;
+        }
+
+        createParticle(x, y, size, variation, isA, shape) {
+          const w = size * 1.3 * variation;
+          const h = size * variation;
+          const color = isA ? "#60a5fa" : "#34d399";
+          const options = {
+            friction: this.config.particles.friction,
+            frictionStatic: this.config.particles.friction * 1.2,
+            frictionAir: this.config.physics.airFriction,
+            restitution: this.config.physics.restitution,
+            density: 0.001,
+            label: isA ? "A" : "B",
+            render: { fillStyle: color },
+          };
+
+          let particle;
+          switch (shape) {
+            case "circle":
+              particle = Matter.Bodies.circle(
+                x,
+                y,
+                size * 0.5 * variation,
+                options
+              );
+              break;
+            case "polygon":
+              particle = Matter.Bodies.polygon(
+                x,
+                y,
+                6,
+                size * 0.5 * variation,
+                options
+              );
+              break;
+            case "rectangle":
+            default:
+              particle = Matter.Bodies.rectangle(x, y, w, h, {
+                ...options,
+                chamfer: { radius: size * 0.2 },
+              });
+              break;
+          }
+          return particle;
+        }
+
+        updateDrum() {
+          if (this.state.isPaused) return;
+
+          const dt = 1 / 60;
+          const targetRpm = this.config.drum.rpm;
+          const angularVel = (targetRpm * 2 * Math.PI) / 60;
+          const stepRotation = angularVel * dt;
+
+          this.state.drumAngle += stepRotation;
+          const bodies = this.state.drumComposite.bodies;
+          bodies.forEach((body) => {
+            const currentPos = body.position;
+            const relativePos = Matter.Vector.sub(
+              currentPos,
+              this.state.drumCenter
+            );
+            const rotatedPos = Matter.Vector.rotate(relativePos, stepRotation);
+            const newPos = Matter.Vector.add(this.state.drumCenter, rotatedPos);
+
+            Matter.Body.setPosition(body, newPos);
+            Matter.Body.setAngle(body, body.angle + stepRotation);
+          });
+        }
+
+        updateMetrics() {
+          const now = Date.now();
+          let totalRecentFlips = 0;
+          const cutoff = now - 10000;
+
+          this.state.particles.forEach((p) => {
+            const t = this.state.flipTracker.get(p.id);
+            let delta = p.angle - t.lastAngle;
+            while (delta > Math.PI) delta -= Math.PI * 2;
+            while (delta < -Math.PI) delta += Math.PI * 2;
+            t.cumRot += Math.abs(delta);
+            t.lastAngle = p.angle;
+            if (t.cumRot >= Math.PI) {
+              t.flips++;
+              t.cumRot -= Math.PI;
+              t.history.push(now);
+            }
+            t.history = t.history.filter((time) => time > cutoff);
+            totalRecentFlips += t.history.length;
+          });
+
+          const flipRate =
+            (totalRecentFlips / this.state.particles.length) * (60 / 10);
+          const angularBins = 8;
+          const bins = Array(angularBins)
+            .fill(0)
+            .map(() => ({ a: 0, b: 0 }));
+          const radialBins = 3;
+          const rBins = Array(radialBins)
+            .fill(0)
+            .map(() => ({ a: 0, b: 0 }));
+          const drumR = this.config.drum.radius;
+
+          this.state.particles.forEach((p) => {
+            const dx = p.position.x - this.state.drumCenter.x;
+            const dy = p.position.y - this.state.drumCenter.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const angle = Math.atan2(dy, dx);
+            const aIdx =
+              Math.floor(((angle + Math.PI) / (Math.PI * 2)) * angularBins) %
+              angularBins;
+            const rIdx = Math.min(
+              radialBins - 1,
+              Math.floor((dist / drumR) * radialBins)
+            );
+            if (p.label === "A") {
+              bins[aIdx].a++;
+              rBins[rIdx].a++;
+            } else {
+              bins[aIdx].b++;
+              rBins[rIdx].b++;
+            }
+          });
+
+          const calcIdx = (arr) => {
+            let variance = 0,
+              count = 0;
+            arr.forEach((b) => {
+              const total = b.a + b.b;
+              if (total > 1) {
+                const ratio = b.a / total;
+                variance += Math.pow(ratio - 0.5, 2);
+                count++;
+              }
+            });
+            if (count === 0) return 0;
+            return Math.max(0, 1 - Math.sqrt(variance / count) * 2);
+          };
+
+          const mixingIndex = Math.round(calcIdx(bins) * 100);
+          const radialUniformity = Math.round(calcIdx(rBins) * 100);
+
+          document.getElementById("m-overall").textContent = mixingIndex;
+          document.getElementById("pb-overall").style.width = mixingIndex + "%";
+          document.getElementById("m-flip").textContent = flipRate.toFixed(1);
+          document.getElementById("pb-flip").style.width =
+            Math.min(100, (flipRate / 20) * 100) + "%";
+          document.getElementById("m-radial").textContent = radialUniformity;
+          document.getElementById("pb-radial").style.width =
+            radialUniformity + "%";
+
+          // Calculate comprehensive score
+          const flipRateScore = Math.min(100, (flipRate / 15) * 100);
+          const comprehensiveScore = Math.round(
+            mixingIndex * 0.4 + flipRateScore * 0.35 + radialUniformity * 0.25
+          );
+
+          document.getElementById("m-comprehensive").textContent =
+            comprehensiveScore;
+
+          // Update grade badge
+          const gradeBadge = document.getElementById("grade-badge");
+          let grade, gradeClass;
+          if (comprehensiveScore >= 90) {
+            grade = "S";
+            gradeClass = "grade-s";
+          } else if (comprehensiveScore >= 75) {
+            grade = "A";
+            gradeClass = "grade-a";
+          } else if (comprehensiveScore >= 60) {
+            grade = "B";
+            gradeClass = "grade-b";
+          } else if (comprehensiveScore >= 40) {
+            grade = "C";
+            gradeClass = "grade-c";
+          } else {
+            grade = "D";
+            gradeClass = "grade-d";
+          }
+          gradeBadge.textContent = `Grade ${grade}`;
+          gradeBadge.className = `grade-badge ${gradeClass}`;
+
+          if (this.state.frameCount % 60 === 0) {
+            this.metrics.history.push({
+              time: Math.floor((now - this.state.startTime) / 1000),
+              mixing: mixingIndex,
+              flip: flipRate,
+              radial: radialUniformity,
+              comprehensive: comprehensiveScore,
+            });
+            if (this.metrics.history.length > this.metrics.maxPoints)
+              this.metrics.history.shift();
+            this.updateChart();
+          }
+        }
+
+        loop() {
+          this.state.frameCount++;
+          if (!this.state.isPaused) {
+            this.updateDrum();
+            Matter.Engine.update(this.engine, 1000 / 60);
+          }
+          Matter.Render.world(this.render);
+          if (this.state.frameCount % 10 === 0) this.updateMetrics();
+          const now = Date.now();
+          if (now - this.state.lastFpsUpdate >= 1000) {
+            document.getElementById(
+              "fps-counter"
+            ).textContent = `FPS: ${this.state.frameCount}`;
+            this.state.frameCount = 0;
+            this.state.lastFpsUpdate = now;
+            const elapsed = Math.floor((now - this.state.startTime) / 1000);
+            document.getElementById("sim-time").textContent = `${String(
+              Math.floor(elapsed / 60)
+            ).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
+          }
+          requestAnimationFrame(() => this.loop());
+        }
+
+        bindEvents() {
+          const sliders = [
+            "drum-radius",
+            "drum-rpm",
+            "baffle-count",
+            "baffle-length",
+            "baffle-tilt",
+            "baffle-thickness",
+            "particle-count",
+            "particle-size",
+            "particle-friction",
+            "gravity-scale",
+            "restitution",
+            "air-friction",
+            "iterations",
+          ];
+          sliders.forEach((id) => {
+            const el = document.getElementById(id);
+            const valEl = document.getElementById("v-" + id);
+            el.oninput = () => {
+              if (id === "particle-friction" || id === "restitution") {
+                valEl.textContent = (el.value / 100).toFixed(1);
+              } else if (id === "gravity-scale") {
+                valEl.textContent = (el.value / 100).toFixed(1);
+              } else if (id === "air-friction") {
+                valEl.textContent = (el.value / 100).toFixed(2);
+              } else {
+                valEl.textContent = el.value;
+              }
+            };
+          });
+          document.getElementById("btn-rebuild").onclick = () => this.build();
+          document.getElementById("btn-pause").onclick = (e) => {
+            this.state.isPaused = !this.state.isPaused;
+            e.target.textContent = this.state.isPaused ? "Resume" : "Pause";
+          };
+          document.getElementById("btn-save-preset").onclick = () =>
+            this.savePreset();
+          document.getElementById("btn-export").onclick = () =>
+            this.exportCSV();
+          document.getElementById("btn-load-preset").onclick = () =>
+            document.getElementById("load-file").click();
+          document.getElementById("load-file").onchange = (e) =>
+            this.loadPreset(e);
+
+          // Modal handlers
+          const setupModal = (btnId, modalId, closeId) => {
+            document.getElementById(btnId).onclick = () => {
+              document.getElementById(modalId).classList.add("active");
+            };
+            document.getElementById(closeId).onclick = () => {
+              document.getElementById(modalId).classList.remove("active");
+            };
+            document.getElementById(modalId).onclick = (e) => {
+              if (e.target.id === modalId) {
+                document.getElementById(modalId).classList.remove("active");
+              }
+            };
+          };
+          setupModal("btn-help-scores", "modal-scores", "close-scores");
+          setupModal("btn-help-params", "modal-params", "close-params");
+
+          window.onresize = () => this.handleResize();
+          this.handleResize();
+          this.build();
+        }
+
+        savePreset() {
+          const data = {
+            config: this.config,
+            timestamp: new Date().toISOString(),
+          };
+          const blob = new Blob([JSON.stringify(data, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `tumbler_preset_${Date.now()}.json`;
+          a.click();
+        }
+
+        loadPreset(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const data = JSON.parse(event.target.result);
+              if (data.config) {
+                Object.assign(this.config, data.config);
+                this.updateUIFromConfig();
+                this.build();
+              }
+            } catch (err) {
+              alert("Failed to load preset: " + err.message);
+            }
+          };
+          reader.readAsText(file);
+        }
+
+        updateUIFromConfig() {
+          const mapping = {
+            "drum-radius": this.config.drum.radius,
+            "drum-rpm": this.config.drum.rpm,
+            "baffle-count": this.config.baffles.count,
+            "baffle-length": this.config.baffles.length,
+            "baffle-tilt": this.config.baffles.tilt,
+            "baffle-pattern": this.config.baffles.pattern,
+            "particle-count": this.config.particles.count,
+            "particle-size": this.config.particles.size,
+            "particle-friction": this.config.particles.friction * 100,
+          };
+          for (const [id, val] of Object.entries(mapping)) {
+            const el = document.getElementById(id);
+            if (el) {
+              el.value = val;
+              const vEl = document.getElementById("v-" + id);
+              if (vEl)
+                vEl.textContent =
+                  id === "particle-friction" ? (val / 100).toFixed(1) : val;
+            }
+          }
+        }
+
+        exportCSV() {
+          if (this.metrics.history.length === 0) {
+            alert("No data to export yet.");
+            return;
+          }
+          let csv =
+            "Time(s),Overall Mixing(%),Flip Rate(flips/min),Radial Uniformity(%)\n";
+          this.metrics.history.forEach((h) => {
+            csv += `${h.time},${h.mixing},${h.flip},${h.radial}\n`;
+          });
+          const blob = new Blob([csv], { type: "text/csv" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `mixing_report_${Date.now()}.csv`;
+          a.click();
+        }
+
+        handleResize() {
+          const wrap = document.getElementById("canvas-wrap");
+          const w = wrap.clientWidth;
+          const h = wrap.clientHeight;
+          this.canvas.width = w;
+          this.canvas.height = h;
+          this.state.drumCenter = { x: w / 2, y: h / 2 };
+          this.render.options.width = w;
+          this.render.options.height = h;
+          this.build();
+        }
+
+        initCharts() {
+          const ctx = document.getElementById("history-chart").getContext("2d");
+          this.historyChart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: [],
+              datasets: [
+                {
+                  label: "Mixing",
+                  data: [],
+                  borderColor: "#3b82f6",
+                  tension: 0.3,
+                  pointRadius: 0,
+                },
+                {
+                  label: "Radial",
+                  data: [],
+                  borderColor: "#f59e0b",
+                  tension: 0.3,
+                  pointRadius: 0,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  min: 0,
+                  max: 100,
+                  grid: { color: "#ffffff10" },
+                  ticks: { color: "#94a3b8", font: { size: 10 } },
+                },
+                x: { display: false },
+              },
+              plugins: { legend: { display: false } },
+            },
+          });
+        }
+
+        updateChart() {
+          this.historyChart.data.labels = this.metrics.history.map(
+            (h) => h.time + "s"
+          );
+          this.historyChart.data.datasets[0].data = this.metrics.history.map(
+            (h) => h.mixing
+          );
+          this.historyChart.data.datasets[1].data = this.metrics.history.map(
+            (h) => h.radial
+          );
+          this.historyChart.update("none");
+        }
+      }
+      window.onload = () => {
+        window.app = new TumblerSim();
+      };
+    </script>
+  </body>
+</html>

@@ -1,0 +1,3147 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🥁 Drum Mixing Simulator v1.0</title>
+
+    <!-- CDN Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <style>
+      /* ═══════════════════════════════════════════════════════════════════════
+       CSS VARIABLES & RESET
+       ═══════════════════════════════════════════════════════════════════════ */
+      :root {
+        --primary: #2196f3;
+        --primary-dark: #1565c0;
+        --success: #4caf50;
+        --success-light: #81c784;
+        --warning: #ffc107;
+        --danger: #f44336;
+        --purple: #9c27b0;
+        --dark: #0f0f23;
+        --panel-bg: #16213e;
+        --card-bg: #1f2940;
+        --card-hover: #263350;
+        --text-primary: #ffffff;
+        --text-secondary: #a0aec0;
+        --text-muted: #718096;
+        --border-color: #2d3748;
+        --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        --transition: all 0.3s ease;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--dark);
+        color: var(--text-primary);
+        overflow: hidden;
+        height: 100%;
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════
+       SCROLLBAR STYLING
+       ═══════════════════════════════════════════════════════════════════════ */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: var(--dark);
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 3px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--primary);
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════
+       LAYOUT (3-COLUMN GRID)
+       ═══════════════════════════════════════════════════════════════════════ */
+      .app-container {
+        display: grid;
+        grid-template-columns: 300px 1fr 340px;
+        height: 100vh;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      @media (max-width: 1200px) {
+        .app-container {
+          grid-template-columns: 260px 1fr 300px;
+        }
+      }
+
+      @media (max-width: 900px) {
+        .app-container {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr auto;
+          overflow-y: auto;
+        }
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════
+       PANEL BASE STYLES
+       ═══════════════════════════════════════════════════════════════════════ */
+      .panel {
+        background: var(--panel-bg);
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .panel-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-primary);
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════
+       CONTROL PANEL (LEFT)
+       ═══════════════════════════════════════════════════════════════════════ */
+      .control-panel {
+        overflow-y: auto;
+        gap: 12px;
+      }
+
+      .control-section {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 14px;
+        transition: var(--transition);
+      }
+
+      .control-section:hover {
+        background: var(--card-hover);
+      }
+
+      .section-header {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--primary);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .control-row {
+        display: grid;
+        grid-template-columns: 1fr 90px 50px;
+        align-items: center;
+        margin-bottom: 10px;
+        gap: 8px;
+      }
+
+      .control-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .control-row label {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      .control-row input[type="range"] {
+        width: 100%;
+        height: 6px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: var(--border-color);
+        border-radius: 3px;
+        outline: none;
+        cursor: pointer;
+      }
+
+      .control-row input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        background: var(--primary);
+        border-radius: 50%;
+        cursor: pointer;
+        transition: var(--transition);
+      }
+
+      .control-row input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+        background: var(--primary-dark);
+      }
+
+      .control-row .value {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+        text-align: right;
+        font-family: "Consolas", monospace;
+      }
+
+      .control-row select {
+        width: 100%;
+        padding: 6px 8px;
+        background: var(--dark);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-size: 11px;
+        cursor: pointer;
+        outline: none;
+      }
+
+      .control-row select:focus {
+        border-color: var(--primary);
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════
+       BUTTON STYLES
+       ═══════════════════════════════════════════════════════════════════════ */
+      .btn-group {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .btn {
+        padding: 10px 14px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+
+      .btn-primary {
+        background: linear-gradient(
+          135deg,
+          var(--primary) 0%,
+          var(--primary-dark) 100%
+        );
+        color: white;
+      }
+
+      .btn-success {
+        background: linear-gradient(135deg, var(--success) 0%, #388e3c 100%);
+        color: white;
+      }
+
+      .btn-warning {
+        background: linear-gradient(135deg, var(--warning) 0%, #f57c00 100%);
+        color: #1a1a1a;
+      }
+
+      .btn-danger {
+        background: linear-gradient(135deg, var(--danger) 0%, #c62828 100%);
+        color: white;
+      }
+
+      .btn-secondary {
+        background: var(--card-bg);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════
+       CANVAS CONTAINER (CENTER)
+       ═══════════════════════════════════════════════════════════════════════ */
+      .canvas-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+      }
+
+      #simulation-canvas {
+        border-radius: 12px;
+        max-width: 100%;
+        max-height: 100%;
+      }
+
+      .canvas-overlay {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .overlay-badge {
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(4px);
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .badge-fps {
+        color: var(--success-light);
+      }
+
+      .badge-time {
+        color: var(--warning);
+      }
+
+      .badge-particles {
+        color: var(--primary);
+      }
+
+      .canvas-legend {
+        position: absolute;
+        bottom: 12px;
+        left: 12px;
+        display: flex;
+        gap: 12px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+
+      .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+      }
+
+      .legend-dot.group-a {
+        background: #ff6b6b;
+      }
+
+      .legend-dot.group-b {
+        background: #4ecdc4;
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════
+       SCORE DASHBOARD (RIGHT)
+       ═══════════════════════════════════════════════════════════════════════ */
+      .score-dashboard {
+        overflow-y: auto;
+        gap: 12px;
+      }
+
+      /* Overall Score Card */
+      .overall-score-card {
+        background: linear-gradient(135deg, var(--card-bg) 0%, #2a3a5a 100%);
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      .overall-score-card::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(
+          circle,
+          rgba(255, 255, 255, 0.03) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      .score-ring-container {
+        width: 140px;
+        height: 140px;
+        margin: 0 auto 16px;
+        position: relative;
+      }
+
+      .score-ring {
+        width: 100%;
+        height: 100%;
+        transform: rotate(-90deg);
+      }
+
+      .score-ring-bg {
+        fill: none;
+        stroke: var(--border-color);
+        stroke-width: 8;
+      }
+
+      .score-ring-progress {
+        fill: none;
+        stroke: var(--primary);
+        stroke-width: 8;
+        stroke-linecap: round;
+        stroke-dasharray: 377;
+        stroke-dashoffset: 377;
+        transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
+      }
+
+      .score-value-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+      }
+
+      .score-value {
+        font-size: 48px;
+        font-weight: 700;
+        line-height: 1;
+        background: linear-gradient(135deg, #fff 0%, #a0aec0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .score-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .score-grade-badge {
+        display: inline-block;
+        padding: 6px 20px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 12px;
+        transition: var(--transition);
+      }
+
+      .score-suggestion {
+        font-size: 11px;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+
+      /* Metric Cards */
+      .metric-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 14px;
+        border-left: 3px solid var(--border-color);
+        transition: var(--transition);
+      }
+
+      .metric-card:hover {
+        background: var(--card-hover);
+      }
+
+      .metric-card.highlight {
+        border-left-color: var(--primary);
+      }
+
+      .metric-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+      }
+
+      .metric-info {
+        flex: 1;
+      }
+
+      .metric-name {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+      }
+
+      .metric-value {
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .metric-unit {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-left: 4px;
+      }
+
+      .metric-bar-container {
+        background: var(--dark);
+        border-radius: 4px;
+        height: 6px;
+        overflow: hidden;
+        margin-top: 8px;
+      }
+
+      .metric-bar {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+
+      .metric-status {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      /* Chart Container */
+      .chart-section {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 14px;
+        flex: 1;
+        min-height: 180px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chart-header {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .chart-container {
+        flex: 1;
+        position: relative;
+        min-height: 140px;
+      }
+
+      /* Export Section */
+      .export-section {
+        display: flex;
+        gap: 8px;
+      }
+
+      .export-section .btn {
+        flex: 1;
+        padding: 8px 12px;
+        font-size: 11px;
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════
+       LOADING & ERROR STATES
+       ═══════════════════════════════════════════════════════════════════════ */
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 15, 35, 0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 16px;
+        z-index: 100;
+      }
+
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid var(--border-color);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loading-text {
+        margin-top: 16px;
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      .error-message {
+        background: rgba(244, 67, 54, 0.1);
+        border: 1px solid var(--danger);
+        border-radius: 8px;
+        padding: 12px;
+        margin: 8px 0;
+        font-size: 12px;
+        color: var(--danger);
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════
+       TOOLTIP
+       ═══════════════════════════════════════════════════════════════════════ */
+      .tooltip {
+        position: relative;
+        cursor: help;
+      }
+
+      .tooltip::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--dark);
+        color: var(--text-primary);
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        transition: var(--transition);
+        z-index: 1000;
+        border: 1px solid var(--border-color);
+      }
+
+      .tooltip:hover::after {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════
+       HELP MODAL
+       ═══════════════════════════════════════════════════════════════════════ */
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 20px;
+        backdrop-filter: blur(4px);
+      }
+
+      .modal-overlay.active {
+        display: flex;
+      }
+
+      .modal-content {
+        background: var(--panel-bg);
+        border-radius: 20px;
+        max-width: 640px;
+        width: 100%;
+        max-height: 85vh;
+        overflow-y: auto;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        border: 1px solid var(--border-color);
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border-color);
+        position: sticky;
+        top: 0;
+        background: var(--panel-bg);
+        z-index: 10;
+      }
+
+      .modal-title {
+        font-size: 20px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .modal-close {
+        background: var(--card-bg);
+        border: none;
+        color: var(--text-secondary);
+        font-size: 24px;
+        cursor: pointer;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+      }
+
+      .modal-close:hover {
+        background: var(--danger);
+        color: white;
+      }
+
+      .modal-body {
+        padding: 24px;
+      }
+
+      .help-intro {
+        background: linear-gradient(
+          135deg,
+          rgba(33, 150, 243, 0.1) 0%,
+          rgba(156, 39, 176, 0.1) 100%
+        );
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
+        border-left: 4px solid var(--primary);
+      }
+
+      .help-intro p {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+
+      .help-section {
+        margin-bottom: 24px;
+      }
+
+      .help-section-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .help-metric {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        border-left: 4px solid var(--border-color);
+      }
+
+      .help-metric.flip {
+        border-left-color: #2196f3;
+      }
+      .help-metric.mix {
+        border-left-color: #4caf50;
+      }
+      .help-metric.cover {
+        border-left-color: #ff9800;
+      }
+      .help-metric.motion {
+        border-left-color: #e91e63;
+      }
+      .help-metric.overall {
+        border-left-color: #ffd700;
+      }
+
+      .help-metric-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .help-metric-icon {
+        font-size: 24px;
+      }
+
+      .help-metric-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .help-metric-en {
+        font-size: 11px;
+        color: var(--text-muted);
+        font-weight: 400;
+      }
+
+      .help-metric-desc {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.7;
+        margin-bottom: 12px;
+      }
+
+      .help-metric-example {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .help-metric-example strong {
+        color: var(--warning);
+      }
+
+      .help-range-table {
+        width: 100%;
+        margin-top: 10px;
+        font-size: 12px;
+      }
+
+      .help-range-table td {
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .help-range-table td:first-child {
+        font-weight: 600;
+        width: 80px;
+      }
+
+      .range-bad {
+        color: #f44336;
+      }
+      .range-poor {
+        color: #ff9800;
+      }
+      .range-ok {
+        color: #ffc107;
+      }
+      .range-good {
+        color: #8bc34a;
+      }
+      .range-great {
+        color: #4caf50;
+      }
+      .range-optimal {
+        color: #ffd700;
+      }
+
+      .help-btn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(
+          135deg,
+          var(--primary) 0%,
+          var(--purple) 100%
+        );
+        border: none;
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(33, 150, 243, 0.4);
+        transition: var(--transition);
+        z-index: 1000;
+      }
+
+      .help-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(33, 150, 243, 0.6);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="app-container">
+      <!-- ═══════════════════════════════════════════════════════════════════
+             LEFT PANEL: CONTROLS
+             ═══════════════════════════════════════════════════════════════════ -->
+      <div class="panel control-panel">
+        <div class="panel-title">⚙️ 시뮬레이터 설정</div>
+
+        <!-- Drum Settings -->
+        <div class="control-section">
+          <div class="section-header">🥁 드럼 (Drum)</div>
+          <div class="control-row">
+            <label>반지름</label>
+            <input
+              type="range"
+              id="ctrl-drum-radius"
+              min="120"
+              max="300"
+              value="220"
+            />
+            <span class="value" id="val-drum-radius">220px</span>
+          </div>
+          <div class="control-row">
+            <label>회전 속도</label>
+            <input
+              type="range"
+              id="ctrl-drum-rpm"
+              min="1"
+              max="50"
+              value="12"
+            />
+            <span class="value" id="val-drum-rpm">12 RPM</span>
+          </div>
+        </div>
+
+        <!-- Baffle Settings -->
+        <div class="control-section">
+          <div class="section-header">📐 배플 (Baffles)</div>
+          <div class="control-row">
+            <label>개수</label>
+            <input
+              type="range"
+              id="ctrl-baffle-count"
+              min="0"
+              max="12"
+              value="4"
+            />
+            <span class="value" id="val-baffle-count">4개</span>
+          </div>
+          <div class="control-row">
+            <label>길이</label>
+            <input
+              type="range"
+              id="ctrl-baffle-length"
+              min="20"
+              max="100"
+              value="50"
+            />
+            <span class="value" id="val-baffle-length">50px</span>
+          </div>
+          <div class="control-row">
+            <label>기울기</label>
+            <input
+              type="range"
+              id="ctrl-baffle-tilt"
+              min="-45"
+              max="45"
+              value="15"
+            />
+            <span class="value" id="val-baffle-tilt">15°</span>
+          </div>
+          <div class="control-row">
+            <label>배치 패턴</label>
+            <select id="ctrl-baffle-pattern" style="grid-column: span 2">
+              <option value="uniform">균등 배치</option>
+              <option value="alternating">교차 배치</option>
+              <option value="clustered">군집 배치</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Particle Settings -->
+        <div class="control-section">
+          <div class="section-header">🍗 입자 (Particles)</div>
+          <div class="control-row">
+            <label>수량</label>
+            <input
+              type="range"
+              id="ctrl-particle-count"
+              min="30"
+              max="250"
+              value="120"
+            />
+            <span class="value" id="val-particle-count">120개</span>
+          </div>
+          <div class="control-row">
+            <label>크기</label>
+            <input
+              type="range"
+              id="ctrl-particle-size"
+              min="8"
+              max="35"
+              value="16"
+            />
+            <span class="value" id="val-particle-size">16px</span>
+          </div>
+          <div class="control-row">
+            <label>마찰 계수</label>
+            <input
+              type="range"
+              id="ctrl-friction"
+              min="0"
+              max="100"
+              value="40"
+            />
+            <span class="value" id="val-friction">0.40</span>
+          </div>
+          <div class="control-row">
+            <label>반발 계수</label>
+            <input
+              type="range"
+              id="ctrl-restitution"
+              min="0"
+              max="80"
+              value="25"
+            />
+            <span class="value" id="val-restitution">0.25</span>
+          </div>
+        </div>
+
+        <!-- Environment Settings -->
+        <div class="control-section">
+          <div class="section-header">🌍 환경</div>
+          <div class="control-row">
+            <label>중력 배율</label>
+            <input
+              type="range"
+              id="ctrl-gravity"
+              min="20"
+              max="250"
+              value="100"
+            />
+            <span class="value" id="val-gravity">1.0g</span>
+          </div>
+          <div class="control-row">
+            <label>시간 배율</label>
+            <input
+              type="range"
+              id="ctrl-timescale"
+              min="25"
+              max="200"
+              value="100"
+            />
+            <span class="value" id="val-timescale">1.0x</span>
+          </div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="btn-group">
+          <button class="btn btn-success" id="btn-rebuild">🔨 재구성</button>
+          <button class="btn btn-warning" id="btn-randomize">🎲 랜덤</button>
+          <button class="btn btn-primary" id="btn-reset">🔄 리셋</button>
+          <button class="btn btn-danger" id="btn-pause">⏸️ 일시정지</button>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+             CENTER: SIMULATION CANVAS
+             ═══════════════════════════════════════════════════════════════════ -->
+      <div class="panel canvas-container" id="canvas-wrapper">
+        <div class="canvas-overlay">
+          <span class="overlay-badge badge-fps" id="badge-fps">FPS: 60</span>
+          <span class="overlay-badge badge-time" id="badge-time">⏱️ 0:00</span>
+          <span class="overlay-badge badge-particles" id="badge-particles"
+            >📦 120</span
+          >
+        </div>
+        <canvas id="simulation-canvas"></canvas>
+        <div class="canvas-legend">
+          <div class="legend-item">
+            <div class="legend-dot group-a"></div>
+            <span>그룹 A</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot group-b"></div>
+            <span>그룹 B</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════════════════
+             RIGHT PANEL: SCORE DASHBOARD
+             ═══════════════════════════════════════════════════════════════════ -->
+      <div class="panel score-dashboard">
+        <div class="panel-title">📊 성능 분석</div>
+
+        <!-- Overall Score -->
+        <div class="overall-score-card">
+          <div class="score-ring-container">
+            <svg class="score-ring" viewBox="0 0 128 128">
+              <circle class="score-ring-bg" cx="64" cy="64" r="56" />
+              <circle
+                class="score-ring-progress"
+                id="score-ring"
+                cx="64"
+                cy="64"
+                r="56"
+              />
+            </svg>
+            <div class="score-value-container">
+              <div class="score-value" id="overall-score">0</div>
+              <div class="score-label">종합 점수</div>
+            </div>
+          </div>
+          <div
+            class="score-grade-badge"
+            id="score-grade"
+            style="background: #333"
+          >
+            측정중
+          </div>
+          <div class="score-suggestion" id="score-suggestion">
+            시뮬레이션을 시작하세요
+          </div>
+        </div>
+
+        <!-- Flip Rate (Primary KPI) -->
+        <div class="metric-card highlight">
+          <div class="metric-header">
+            <div class="metric-info">
+              <div class="metric-name">🔄 뒤집힘 빈도 (Flip Rate)</div>
+              <div class="metric-value">
+                <span id="metric-fliprate">0.0</span>
+                <span class="metric-unit">회/분/개</span>
+              </div>
+            </div>
+          </div>
+          <div class="metric-bar-container">
+            <div
+              class="metric-bar"
+              id="bar-fliprate"
+              style="width: 0%; background: var(--primary)"
+            ></div>
+          </div>
+          <div class="metric-status" id="status-fliprate">
+            <span class="status-dot" style="background: #666"></span>
+            <span>대기중</span>
+          </div>
+        </div>
+
+        <!-- Mixing Index -->
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-info">
+              <div class="metric-name">🎯 혼합도 (Mixing Index)</div>
+              <div class="metric-value">
+                <span id="metric-mixing">0</span>
+                <span class="metric-unit">%</span>
+              </div>
+            </div>
+          </div>
+          <div class="metric-bar-container">
+            <div
+              class="metric-bar"
+              id="bar-mixing"
+              style="width: 0%; background: var(--success)"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Coverage -->
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-info">
+              <div class="metric-name">📍 영역 커버리지</div>
+              <div class="metric-value">
+                <span id="metric-coverage">0</span>
+                <span class="metric-unit">%</span>
+              </div>
+            </div>
+          </div>
+          <div class="metric-bar-container">
+            <div
+              class="metric-bar"
+              id="bar-coverage"
+              style="width: 0%; background: var(--warning)"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Motion Activity -->
+        <div class="metric-card">
+          <div class="metric-header">
+            <div class="metric-info">
+              <div class="metric-name">⚡ 운동 활성도</div>
+              <div class="metric-value">
+                <span id="metric-motion">0</span>
+                <span class="metric-unit">%</span>
+              </div>
+            </div>
+          </div>
+          <div class="metric-bar-container">
+            <div
+              class="metric-bar"
+              id="bar-motion"
+              style="width: 0%; background: var(--purple)"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Time Series Chart -->
+        <div class="chart-section">
+          <div class="chart-header">
+            <span>📈 실시간 추이</span>
+            <span id="chart-elapsed">0초 경과</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="metrics-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- Export Buttons -->
+        <div class="export-section">
+          <button class="btn btn-secondary" id="btn-export-csv">📥 CSV</button>
+          <button class="btn btn-secondary" id="btn-save-preset">
+            💾 프리셋
+          </button>
+          <button class="btn btn-secondary" id="btn-load-preset">
+            📂 불러오기
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden file input for preset loading -->
+    <input
+      type="file"
+      id="preset-file-input"
+      accept=".json"
+      style="display: none"
+    />
+
+    <!-- Help Button (Floating) -->
+    <button class="help-btn" id="btn-help" title="점수 해석 도움말">?</button>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="help-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-title">📊 점수 해석 가이드</div>
+          <button class="modal-close" id="btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="help-intro">
+            <p>
+              🍗 <strong>치킨에 소스를 버무리는 텀블러</strong>를 상상해 보세요.
+              각 지표는 "얼마나 골고루, 잘 버무려지고 있는가"를 다양한 관점에서
+              측정합니다.
+            </p>
+          </div>
+
+          <!-- Overall Score -->
+          <div class="help-section">
+            <div class="help-section-title">🏆 종합 점수 (Overall Score)</div>
+            <div class="help-metric overall">
+              <div class="help-metric-header">
+                <span class="help-metric-icon">⭐</span>
+                <span class="help-metric-name">종합 점수</span>
+              </div>
+              <div class="help-metric-desc">
+                아래 4가지 지표를 가중 평균하여 계산한
+                <strong>최종 믹싱 품질 점수</strong>입니다. <br /><br />
+                <strong>가중치:</strong> 뒤집힘(35%) + 혼합도(30%) + 영역
+                커버리지(20%) + 운동 활성도(15%)
+              </div>
+              <table class="help-range-table">
+                <tr>
+                  <td class="range-optimal">90+</td>
+                  <td>S등급 (최적) - 완벽한 믹싱 조건</td>
+                </tr>
+                <tr>
+                  <td class="range-great">80-89</td>
+                  <td>A등급 (우수) - 매우 좋은 상태</td>
+                </tr>
+                <tr>
+                  <td class="range-good">70-79</td>
+                  <td>B등급 (양호) - 괜찮은 수준</td>
+                </tr>
+                <tr>
+                  <td class="range-ok">60-69</td>
+                  <td>C등급 (보통) - 개선 여지 있음</td>
+                </tr>
+                <tr>
+                  <td class="range-poor">50-59</td>
+                  <td>D등급 (미흡) - 설정 조정 필요</td>
+                </tr>
+                <tr>
+                  <td class="range-bad">&lt;50</td>
+                  <td>F등급 (부족) - 즉시 개선 필요</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- Individual Metrics -->
+          <div class="help-section">
+            <div class="help-section-title">📈 개별 지표 상세</div>
+
+            <!-- Flip Rate -->
+            <div class="help-metric flip">
+              <div class="help-metric-header">
+                <span class="help-metric-icon">🔄</span>
+                <span class="help-metric-name"
+                  >뒤집힘 빈도
+                  <span class="help-metric-en">(Flip Rate)</span></span
+                >
+              </div>
+              <div class="help-metric-desc">
+                입자가 <strong>180° 이상 회전(뒤집힘)</strong>하는 횟수를 분당,
+                입자당 평균으로 측정합니다. <br /><br />
+                뒤집힘이 많을수록 입자의 모든 면이 골고루 노출되어 소스가
+                균일하게 묻습니다.
+              </div>
+              <div class="help-metric-example">
+                <strong>💡 비유:</strong> 프라이팬 웍질에서 음식이 공중에서
+                회전하는 것과 같습니다. 뒤집히지 않으면 한쪽 면만 익거나 양념이
+                묻습니다.
+              </div>
+              <table class="help-range-table">
+                <tr>
+                  <td class="range-bad">&lt;3</td>
+                  <td>정체 - 거의 뒤집히지 않음</td>
+                </tr>
+                <tr>
+                  <td class="range-poor">3-8</td>
+                  <td>저조 - 뒤집힘 부족</td>
+                </tr>
+                <tr>
+                  <td class="range-optimal">8-18</td>
+                  <td>최적 - 이상적인 뒤집힘</td>
+                </tr>
+                <tr>
+                  <td class="range-good">18-28</td>
+                  <td>활발 - 약간 과한 회전</td>
+                </tr>
+                <tr>
+                  <td class="range-ok">&gt;28</td>
+                  <td>과다 - 너무 격렬함</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Mixing Index -->
+            <div class="help-metric mix">
+              <div class="help-metric-header">
+                <span class="help-metric-icon">🎯</span>
+                <span class="help-metric-name"
+                  >혼합도
+                  <span class="help-metric-en">(Mixing Index)</span></span
+                >
+              </div>
+              <div class="help-metric-desc">
+                두 그룹(빨강/청록)의 입자가
+                <strong>공간적으로 얼마나 골고루 섞여 있는지</strong>
+                측정합니다. <br /><br />
+                드럼 내부를 8개 구역으로 나눠 각 구역에서 두 그룹의 비율이
+                50:50에 가까울수록 높은 점수입니다.
+              </div>
+              <div class="help-metric-example">
+                <strong>💡 비유:</strong> 후라이드와 양념치킨을 섞었을 때,
+                한쪽에 후라이드만 몰려있으면 혼합도가 낮고, 골고루 섞여 있으면
+                높습니다.
+              </div>
+              <table class="help-range-table">
+                <tr>
+                  <td class="range-bad">&lt;40</td>
+                  <td>분리됨 - 두 그룹이 따로 뭉쳐 있음</td>
+                </tr>
+                <tr>
+                  <td class="range-poor">40-60</td>
+                  <td>부분 혼합 - 일부만 섞임</td>
+                </tr>
+                <tr>
+                  <td class="range-good">60-80</td>
+                  <td>양호 - 대체로 잘 섞임</td>
+                </tr>
+                <tr>
+                  <td class="range-optimal">&gt;80</td>
+                  <td>우수 - 매우 균일하게 분포</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Coverage -->
+            <div class="help-metric cover">
+              <div class="help-metric-header">
+                <span class="help-metric-icon">📍</span>
+                <span class="help-metric-name"
+                  >영역 커버리지
+                  <span class="help-metric-en">(Area Coverage)</span></span
+                >
+              </div>
+              <div class="help-metric-desc">
+                입자들이 드럼 내부 공간을 <strong>얼마나 넓게 활용</strong>하고
+                있는지 측정합니다. <br /><br />
+                드럼 전체를 격자로 나눠 입자가 방문한 영역의 비율을 계산합니다.
+              </div>
+              <div class="help-metric-example">
+                <strong>💡 비유:</strong> 세탁기에서 빨래가 펼쳐져 돌면
+                커버리지가 높고, 한 덩어리로 뭉쳐서 돌면 커버리지가 낮습니다.
+              </div>
+              <table class="help-range-table">
+                <tr>
+                  <td class="range-bad">&lt;20</td>
+                  <td>협소 - 한곳에만 모여 있음</td>
+                </tr>
+                <tr>
+                  <td class="range-poor">20-40</td>
+                  <td>제한적 - 일부 영역만 사용</td>
+                </tr>
+                <tr>
+                  <td class="range-good">40-60</td>
+                  <td>양호 - 적당히 퍼져 있음</td>
+                </tr>
+                <tr>
+                  <td class="range-optimal">&gt;60</td>
+                  <td>우수 - 공간을 잘 활용</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Motion Activity -->
+            <div class="help-metric motion">
+              <div class="help-metric-header">
+                <span class="help-metric-icon">⚡</span>
+                <span class="help-metric-name"
+                  >운동 활성도
+                  <span class="help-metric-en">(Motion Activity)</span></span
+                >
+              </div>
+              <div class="help-metric-desc">
+                입자들이 <strong>얼마나 활발하게 움직이는지</strong>(선속도 +
+                각속도)를 측정합니다. <br /><br />
+                활성도가 너무 낮으면 정체, 너무 높으면 입자끼리 충돌로 손상
+                위험이 있습니다.
+              </div>
+              <div class="help-metric-example">
+                <strong>💡 비유:</strong> 치킨을 버무릴 때 너무 약하게 흔들면 안
+                섞이고, 너무 세게 흔들면 치킨이 부서집니다. 적당한 강도가
+                중요합니다.
+              </div>
+              <table class="help-range-table">
+                <tr>
+                  <td class="range-bad">&lt;20</td>
+                  <td>정체 - 거의 움직이지 않음</td>
+                </tr>
+                <tr>
+                  <td class="range-poor">20-40</td>
+                  <td>저조 - 움직임 부족</td>
+                </tr>
+                <tr>
+                  <td class="range-optimal">40-70</td>
+                  <td>적정 - 이상적인 활성도</td>
+                </tr>
+                <tr>
+                  <td class="range-ok">&gt;70</td>
+                  <td>과다 - 너무 격렬함</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tips -->
+          <div class="help-section">
+            <div class="help-section-title">💡 조정 팁</div>
+            <div class="help-metric">
+              <div class="help-metric-desc">
+                <strong>뒤집힘이 낮을 때:</strong> RPM 증가, 배플 수/길이 증가,
+                배플 각도 조정<br />
+                <strong>혼합도가 낮을 때:</strong> 시뮬레이션 시간 증가, 배플
+                패턴 변경 (alternating 추천)<br />
+                <strong>커버리지가 낮을 때:</strong> 입자 수 감소, 드럼 반지름
+                증가<br />
+                <strong>활성도가 낮을 때:</strong> RPM 증가, 중력/타임스케일
+                조정
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* ═══════════════════════════════════════════════════════════════════════════════
+       ██████╗ ██████╗ ███╗   ██╗███████╗██╗ ██████╗ ██╗   ██╗██████╗  █████╗ ████████╗██╗ ██████╗ ███╗   ██╗
+      ██╔════╝██╔═══██╗████╗  ██║██╔════╝██║██╔════╝ ██║   ██║██╔══██╗██╔══██╗╚══██╔══╝██║██╔═══██╗████╗  ██║
+      ██║     ██║   ██║██╔██╗ ██║█████╗  ██║██║  ███╗██║   ██║██████╔╝███████║   ██║   ██║██║   ██║██╔██╗ ██║
+      ██║     ██║   ██║██║╚██╗██║██╔══╝  ██║██║   ██║██║   ██║██╔══██╗██╔══██║   ██║   ██║██║   ██║██║╚██╗██║
+      ╚██████╗╚██████╔╝██║ ╚████║██║     ██║╚██████╔╝╚██████╔╝██║  ██║██║  ██║   ██║   ██║╚██████╔╝██║ ╚████║
+       ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
+       ═══════════════════════════════════════════════════════════════════════════════ */
+
+      // Matter.js module aliases
+      const {
+        Engine,
+        Render,
+        Runner,
+        Bodies,
+        Body,
+        Composite,
+        Events,
+        Vector,
+      } = Matter;
+
+      // Global Configuration - User adjustable parameters
+      const CONFIG = {
+        drum: {
+          radius: 220,
+          rpm: 12,
+          wallSegments: 64,
+          wallThickness: 12,
+        },
+        baffles: {
+          count: 4,
+          length: 50,
+          width: 10,
+          tilt: 15,
+          pattern: "uniform", // 'uniform', 'alternating', 'clustered'
+        },
+        particles: {
+          count: 120,
+          size: 16,
+          sizeVariation: 0.25,
+          friction: 0.4,
+          frictionStatic: 0.6,
+          restitution: 0.25,
+          density: 0.0012,
+        },
+        environment: {
+          gravity: 1.0,
+          timeScale: 1.0,
+        },
+        metrics: {
+          updateInterval: 250,
+          angularBins: 8,
+          radialBins: 3,
+          flipThreshold: Math.PI,
+          historyLength: 120,
+        },
+      };
+
+      // Global State
+      const STATE = {
+        engine: null,
+        render: null,
+        runner: null,
+        drumBodies: [],
+        baffleBodies: [],
+        particleBodies: [],
+        drumCenter: { x: 0, y: 0 },
+        drumAngle: 0,
+        isPaused: false,
+        startTime: Date.now(),
+        lastMetricUpdate: 0,
+        metricsHistory: [],
+        currentMetrics: {
+          overall: 0,
+          flipScore: 0,
+          flipRate: 0,
+          mixingIndex: 0,
+          coverage: 0,
+          motion: 0,
+        },
+      };
+
+      // Scoring weights
+      const SCORE_WEIGHTS = {
+        flipScore: 0.35,
+        mixingIndex: 0.3,
+        coverage: 0.2,
+        motion: 0.15,
+      };
+
+      /* ═══════════════════════════════════════════════════════════════════════════════
+       ███████╗██╗     ██╗██████╗     ████████╗██████╗  █████╗  ██████╗██╗  ██╗███████╗██████╗ 
+       ██╔════╝██║     ██║██╔══██╗    ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔══██╗
+       █████╗  ██║     ██║██████╔╝       ██║   ██████╔╝███████║██║     █████╔╝ █████╗  ██████╔╝
+       ██╔══╝  ██║     ██║██╔═══╝        ██║   ██╔══██╗██╔══██║██║     ██╔═██╗ ██╔══╝  ██╔══██╗
+       ██║     ███████╗██║██║            ██║   ██║  ██║██║  ██║╚██████╗██║  ██╗███████╗██║  ██║
+       ╚═╝     ╚══════╝╚═╝╚═╝            ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+       ═══════════════════════════════════════════════════════════════════════════════ */
+
+      const FlipTracker = {
+        data: new Map(),
+
+        init(particles) {
+          this.data.clear();
+          particles.forEach((p) => {
+            this.data.set(p.id, {
+              lastAngle: p.angle,
+              cumulativeRotation: 0,
+              flipCount: 0,
+              flipHistory: [], // timestamps of recent flips
+            });
+          });
+        },
+
+        update(particles, currentTime) {
+          particles.forEach((p) => {
+            const tracker = this.data.get(p.id);
+            if (!tracker) return;
+
+            // Calculate angle change with wrapping
+            let deltaAngle = p.angle - tracker.lastAngle;
+
+            // Handle angle wrapping (-π to π)
+            while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+            while (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+
+            tracker.cumulativeRotation += Math.abs(deltaAngle);
+            tracker.lastAngle = p.angle;
+
+            // Count flips (π radians = 180° = half turn)
+            while (tracker.cumulativeRotation >= CONFIG.metrics.flipThreshold) {
+              tracker.flipCount++;
+              tracker.cumulativeRotation -= CONFIG.metrics.flipThreshold;
+              tracker.flipHistory.push(currentTime);
+            }
+
+            // Keep only flips from last 60 seconds for rate calculation
+            const cutoff = currentTime - 60000;
+            tracker.flipHistory = tracker.flipHistory.filter((t) => t > cutoff);
+          });
+        },
+
+        getFlipRate() {
+          let totalRecentFlips = 0;
+          this.data.forEach((tracker) => {
+            totalRecentFlips += tracker.flipHistory.length;
+          });
+          const particleCount = this.data.size || 1;
+          return totalRecentFlips / particleCount;
+        },
+
+        getTotalFlips() {
+          let total = 0;
+          this.data.forEach((tracker) => {
+            total += tracker.flipCount;
+          });
+          return total;
+        },
+
+        reset() {
+          this.data.clear();
+        },
+      };
+
+      /* ═══════════════════════════════════════════════════════════════════════════════
+       ███╗   ███╗███████╗████████╗██████╗ ██╗ ██████╗███████╗
+       ████╗ ████║██╔════╝╚══██╔══╝██╔══██╗██║██╔════╝██╔════╝
+       ██╔████╔██║█████╗     ██║   ██████╔╝██║██║     ███████╗
+       ██║╚██╔╝██║██╔══╝     ██║   ██╔══██╗██║██║     ╚════██║
+       ██║ ╚═╝ ██║███████╗   ██║   ██║  ██║██║╚██████╗███████║
+       ╚═╝     ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝ ╚═════╝╚══════╝
+       ═══════════════════════════════════════════════════════════════════════════════ */
+
+      /**
+       * Calculate Mixing Index based on angular distribution
+       * Uses Lacey mixing index approach: measures how evenly A/B particles are distributed
+       * @returns {number} Score 0-100
+       */
+      function calculateMixingIndex() {
+        const bins = CONFIG.metrics.angularBins;
+        const angularBins = Array(bins)
+          .fill(null)
+          .map(() => ({ groupA: 0, groupB: 0 }));
+
+        STATE.particleBodies.forEach((p) => {
+          const dx = p.position.x - STATE.drumCenter.x;
+          const dy = p.position.y - STATE.drumCenter.y;
+          const angle = Math.atan2(dy, dx); // -π to π
+
+          // Map angle to bin index
+          const normalizedAngle = (angle + Math.PI) / (2 * Math.PI); // 0 to 1
+          const binIndex = Math.min(
+            Math.floor(normalizedAngle * bins),
+            bins - 1
+          );
+
+          if (p.label === "groupA") {
+            angularBins[binIndex].groupA++;
+          } else {
+            angularBins[binIndex].groupB++;
+          }
+        });
+
+        // Calculate variance from ideal 50:50 ratio
+        const targetRatio = 0.5;
+        let sumSquaredDeviation = 0;
+        let validBins = 0;
+
+        angularBins.forEach((bin) => {
+          const total = bin.groupA + bin.groupB;
+          if (total >= 2) {
+            const actualRatio = bin.groupA / total;
+            sumSquaredDeviation += Math.pow(actualRatio - targetRatio, 2);
+            validBins++;
+          }
+        });
+
+        if (validBins === 0) return 0;
+
+        const variance = sumSquaredDeviation / validBins;
+        const maxVariance = 0.25; // Maximum possible variance (completely separated)
+        const mixingIndex = 1 - Math.sqrt(variance / maxVariance);
+
+        return Math.round(Math.max(0, Math.min(100, mixingIndex * 100)));
+      }
+
+      /**
+       * Calculate Flip Score based on flip rate
+       * Optimal range: 10-20 flips/min/particle
+       * @returns {number} Score 0-100
+       */
+      function calculateFlipScore() {
+        const flipRate = FlipTracker.getFlipRate();
+        const optimalRate = 15;
+        const maxRate = 40;
+
+        let score;
+        if (flipRate <= optimalRate) {
+          // Linear increase from 0 to optimal
+          score = (flipRate / optimalRate) * 100;
+        } else if (flipRate <= maxRate) {
+          // Slight decrease for excessive rotation
+          const excess = (flipRate - optimalRate) / (maxRate - optimalRate);
+          score = 100 - excess * 15;
+        } else {
+          // Cap at 85 for very high rates
+          score = 85;
+        }
+
+        return Math.round(Math.max(0, Math.min(100, score)));
+      }
+
+      /**
+       * Calculate Coverage Score
+       * Measures how much of the drum area particles visit
+       * @returns {number} Score 0-100
+       */
+      function calculateCoverageScore() {
+        const gridSize = 12;
+        const visited = new Set();
+        const drumRadius = CONFIG.drum.radius;
+        const cellSize = (drumRadius * 2) / gridSize;
+
+        STATE.particleBodies.forEach((p) => {
+          const relX = p.position.x - STATE.drumCenter.x + drumRadius;
+          const relY = p.position.y - STATE.drumCenter.y + drumRadius;
+
+          const gridX = Math.floor(relX / cellSize);
+          const gridY = Math.floor(relY / cellSize);
+
+          // Only count cells within drum circle
+          const cellCenterX = (gridX + 0.5) * cellSize - drumRadius;
+          const cellCenterY = (gridY + 0.5) * cellSize - drumRadius;
+          const distFromCenter = Math.sqrt(
+            cellCenterX * cellCenterX + cellCenterY * cellCenterY
+          );
+
+          if (distFromCenter <= drumRadius * 0.95) {
+            visited.add(`${gridX},${gridY}`);
+          }
+        });
+
+        // Approximate number of cells inside drum circle
+        const totalCells = Math.PI * Math.pow(gridSize / 2, 2);
+        const coverage = visited.size / totalCells;
+
+        return Math.round(Math.min(100, coverage * 100));
+      }
+
+      /**
+       * Calculate Motion Score
+       * Combines linear velocity and angular velocity
+       * @returns {number} Score 0-100
+       */
+      function calculateMotionScore() {
+        let totalLinearSpeed = 0;
+        let totalAngularSpeed = 0;
+        const count = STATE.particleBodies.length || 1;
+
+        STATE.particleBodies.forEach((p) => {
+          totalLinearSpeed += Math.sqrt(p.velocity.x ** 2 + p.velocity.y ** 2);
+          totalAngularSpeed += Math.abs(p.angularVelocity);
+        });
+
+        const avgLinearSpeed = totalLinearSpeed / count;
+        const avgAngularSpeed = totalAngularSpeed / count;
+
+        // Normalize to expected ranges (empirical values)
+        const linearScore = Math.min(100, (avgLinearSpeed / 4) * 100);
+        const angularScore = Math.min(100, (avgAngularSpeed / 0.25) * 100);
+
+        // Weight angular speed higher as it's more relevant to mixing
+        return Math.round(linearScore * 0.35 + angularScore * 0.65);
+      }
+
+      /**
+       * Calculate overall score from all metrics
+       * @returns {object} All metrics including overall score
+       */
+      function calculateAllMetrics() {
+        const flipRate = FlipTracker.getFlipRate();
+        const flipScore = calculateFlipScore();
+        const mixingIndex = calculateMixingIndex();
+        const coverage = calculateCoverageScore();
+        const motion = calculateMotionScore();
+
+        // Weighted overall score
+        const overall = Math.round(
+          flipScore * SCORE_WEIGHTS.flipScore +
+            mixingIndex * SCORE_WEIGHTS.mixingIndex +
+            coverage * SCORE_WEIGHTS.coverage +
+            motion * SCORE_WEIGHTS.motion
+        );
+
+        return {
+          overall: Math.max(0, Math.min(100, overall)),
+          flipScore,
+          flipRate: parseFloat(flipRate.toFixed(1)),
+          mixingIndex,
+          coverage,
+          motion,
+        };
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════════════
+       ██████╗ ██╗  ██╗██╗   ██╗███████╗██╗ ██████╗███████╗    ███████╗███████╗████████╗██╗   ██╗██████╗ 
+       ██╔══██╗██║  ██║╚██╗ ██╔╝██╔════╝██║██╔════╝██╔════╝    ██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗
+       ██████╔╝███████║ ╚████╔╝ ███████╗██║██║     ███████╗    ███████╗█████╗     ██║   ██║   ██║██████╔╝
+       ██╔═══╝ ██╔══██║  ╚██╔╝  ╚════██║██║██║     ╚════██║    ╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝ 
+       ██║     ██║  ██║   ██║   ███████║██║╚██████╗███████║    ███████║███████╗   ██║   ╚██████╔╝██║     
+       ╚═╝     ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝ ╚═════╝╚══════╝    ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝     
+       ═══════════════════════════════════════════════════════════════════════════════ */
+
+      /**
+       * Create drum wall segments (circular boundary)
+       */
+      function createDrumWalls() {
+        const walls = [];
+        const segments = CONFIG.drum.wallSegments;
+        const radius = CONFIG.drum.radius;
+        const thickness = CONFIG.drum.wallThickness;
+
+        for (let i = 0; i < segments; i++) {
+          const angle = (2 * Math.PI * i) / segments;
+          const nextAngle = (2 * Math.PI * (i + 1)) / segments;
+          const midAngle = (angle + nextAngle) / 2;
+
+          const x = STATE.drumCenter.x + Math.cos(midAngle) * radius;
+          const y = STATE.drumCenter.y + Math.sin(midAngle) * radius;
+
+          // Segment length with overlap to prevent gaps
+          const segmentLength = 2 * radius * Math.sin(Math.PI / segments) + 4;
+
+          const wall = Bodies.rectangle(x, y, segmentLength, thickness, {
+            isStatic: true,
+            angle: midAngle + Math.PI / 2,
+            friction: 0.8,
+            frictionStatic: 1.0,
+            restitution: 0.1,
+            render: {
+              fillStyle: "#3d4f6f",
+              strokeStyle: "#2d3a50",
+              lineWidth: 1,
+            },
+            label: "drumWall",
+          });
+          walls.push(wall);
+        }
+
+        return walls;
+      }
+
+      /**
+       * Create baffles with different placement patterns
+       */
+      function createBaffles() {
+        const baffles = [];
+        const count = CONFIG.baffles.count;
+
+        if (count === 0) return baffles;
+
+        const drumRadius = CONFIG.drum.radius;
+        const baffleLength = CONFIG.baffles.length;
+        const baffleWidth = CONFIG.baffles.width;
+        const baseTilt = (CONFIG.baffles.tilt * Math.PI) / 180;
+        const pattern = CONFIG.baffles.pattern;
+
+        // Calculate baffle angles based on pattern
+        let angles = [];
+
+        switch (pattern) {
+          case "uniform":
+            // Evenly distributed
+            for (let i = 0; i < count; i++) {
+              angles.push((2 * Math.PI * i) / count);
+            }
+            break;
+
+          case "alternating":
+            // Alternating tilt directions
+            for (let i = 0; i < count; i++) {
+              angles.push({
+                angle: (2 * Math.PI * i) / count,
+                tiltMultiplier: i % 2 === 0 ? 1 : -1,
+              });
+            }
+            break;
+
+          case "clustered":
+            // Two clusters on opposite sides
+            const clusterCount = Math.ceil(count / 2);
+            const clusterSpread = Math.PI / 6; // 30 degrees spread
+            for (let i = 0; i < clusterCount; i++) {
+              const offset =
+                ((i - (clusterCount - 1) / 2) * clusterSpread) / clusterCount;
+              angles.push(offset); // First cluster at top
+            }
+            for (let i = 0; i < count - clusterCount; i++) {
+              const offset =
+                ((i - (count - clusterCount - 1) / 2) * clusterSpread) /
+                clusterCount;
+              angles.push(Math.PI + offset); // Second cluster at bottom
+            }
+            break;
+        }
+
+        angles.forEach((angleData, index) => {
+          let angle, tiltMultiplier;
+
+          if (typeof angleData === "number") {
+            angle = angleData;
+            tiltMultiplier = 1;
+          } else {
+            angle = angleData.angle;
+            tiltMultiplier = angleData.tiltMultiplier;
+          }
+
+          // Position baffle inside drum wall
+          const baffleRadius = drumRadius - baffleLength / 2 - 5;
+          const x = STATE.drumCenter.x + Math.cos(angle) * baffleRadius;
+          const y = STATE.drumCenter.y + Math.sin(angle) * baffleRadius;
+
+          // Calculate baffle angle (perpendicular to radius + tilt)
+          const baffleAngle = angle + Math.PI / 2 + baseTilt * tiltMultiplier;
+
+          const baffle = Bodies.rectangle(x, y, baffleWidth, baffleLength, {
+            isStatic: true,
+            angle: baffleAngle,
+            friction: 0.6,
+            frictionStatic: 0.8,
+            restitution: 0.15,
+            render: {
+              fillStyle: "#E91E63",
+              strokeStyle: "#C2185B",
+              lineWidth: 2,
+            },
+            label: "baffle",
+            baffleBaseAngle: angle, // Store for rotation
+          });
+          baffles.push(baffle);
+        });
+
+        return baffles;
+      }
+
+      /**
+       * Generate organic blob-like vertices (nugget shape)
+       * @param {number} baseRadius - Base radius of the blob
+       * @param {number} irregularity - How irregular the shape is (0-1)
+       * @param {number} numPoints - Number of vertices
+       * @returns {Array} Array of {x, y} vertices
+       */
+      function generateBlobVertices(
+        baseRadius,
+        irregularity = 0.3,
+        numPoints = 10
+      ) {
+        const vertices = [];
+        const angleStep = (2 * Math.PI) / numPoints;
+
+        for (let i = 0; i < numPoints; i++) {
+          const angle = i * angleStep;
+          // Add randomness to radius for organic feel
+          const radiusVariation = 1 + (Math.random() - 0.5) * 2 * irregularity;
+          // Add slight elongation for nugget shape (wider than tall)
+          const elongation = 1 + Math.cos(angle * 2) * 0.2;
+          const r = baseRadius * radiusVariation * elongation;
+
+          vertices.push({
+            x: Math.cos(angle) * r,
+            y: Math.sin(angle) * r,
+          });
+        }
+
+        return vertices;
+      }
+
+      /**
+       * Create particles (organic nugget-like shapes)
+       */
+      function createParticles() {
+        const particles = [];
+        const count = CONFIG.particles.count;
+        const baseSize = CONFIG.particles.size;
+        const variation = CONFIG.particles.sizeVariation;
+        const drumRadius = CONFIG.drum.radius;
+        const baffleLength = CONFIG.baffles.length;
+
+        // Safe spawn radius (inside drum, avoiding baffles)
+        const safeRadius = drumRadius - baffleLength - baseSize - 15;
+
+        for (let i = 0; i < count; i++) {
+          // Random position within safe area
+          const spawnAngle = Math.random() * 2 * Math.PI;
+          const spawnRadius = Math.random() * safeRadius * 0.75;
+
+          const x = STATE.drumCenter.x + Math.cos(spawnAngle) * spawnRadius;
+          const y = STATE.drumCenter.y + Math.sin(spawnAngle) * spawnRadius;
+
+          // Size variation for each particle
+          const sizeMultiplier = 1 + (Math.random() - 0.5) * 2 * variation;
+          const particleRadius = (baseSize / 2) * sizeMultiplier;
+
+          // Determine group (first half = A, second half = B)
+          const isGroupA = i < count / 2;
+
+          // Generate organic blob vertices
+          const numPoints = 8 + Math.floor(Math.random() * 5); // 8-12 points
+          const irregularity = 0.25 + Math.random() * 0.15; // 0.25-0.4
+          const blobVertices = generateBlobVertices(
+            particleRadius,
+            irregularity,
+            numPoints
+          );
+
+          // Create particle from vertices
+          const particle = Bodies.fromVertices(x, y, [blobVertices], {
+            friction: CONFIG.particles.friction,
+            frictionStatic: CONFIG.particles.frictionStatic,
+            restitution: CONFIG.particles.restitution,
+            density: CONFIG.particles.density,
+            frictionAir: 0.001,
+            render: {
+              fillStyle: isGroupA ? "#FF6B6B" : "#4ECDC4",
+              strokeStyle: isGroupA ? "#E55A5A" : "#3DBDB5",
+              lineWidth: 1,
+            },
+            label: isGroupA ? "groupA" : "groupB",
+          });
+
+          // Check if particle was created successfully (fromVertices can fail for concave shapes)
+          if (particle) {
+            // Random initial rotation
+            Body.setAngle(particle, Math.random() * 2 * Math.PI);
+            particles.push(particle);
+          } else {
+            // Fallback to simple circle if blob creation fails
+            const fallback = Bodies.circle(x, y, particleRadius, {
+              friction: CONFIG.particles.friction,
+              frictionStatic: CONFIG.particles.frictionStatic,
+              restitution: CONFIG.particles.restitution,
+              density: CONFIG.particles.density,
+              frictionAir: 0.001,
+              render: {
+                fillStyle: isGroupA ? "#FF6B6B" : "#4ECDC4",
+                strokeStyle: isGroupA ? "#E55A5A" : "#3DBDB5",
+                lineWidth: 1,
+              },
+              label: isGroupA ? "groupA" : "groupB",
+            });
+            particles.push(fallback);
+          }
+        }
+
+        return particles;
+      }
+
+      /**
+       * Build/rebuild the physics world
+       */
+      function buildWorld() {
+        // Clear existing bodies
+        if (STATE.engine) {
+          Composite.clear(STATE.engine.world, false);
+        }
+
+        // Create all bodies
+        STATE.drumBodies = createDrumWalls();
+        STATE.baffleBodies = createBaffles();
+        STATE.particleBodies = createParticles();
+
+        // Add to world
+        Composite.add(STATE.engine.world, STATE.drumBodies);
+        Composite.add(STATE.engine.world, STATE.baffleBodies);
+        Composite.add(STATE.engine.world, STATE.particleBodies);
+
+        // Initialize flip tracker
+        FlipTracker.init(STATE.particleBodies);
+
+        // Reset state
+        STATE.drumAngle = 0;
+        STATE.startTime = Date.now();
+        STATE.metricsHistory = [];
+        STATE.currentMetrics = {
+          overall: 0,
+          flipScore: 0,
+          flipRate: 0,
+          mixingIndex: 0,
+          coverage: 0,
+          motion: 0,
+        };
+
+        // Update particle count badge
+        document.getElementById(
+          "badge-particles"
+        ).textContent = `📦 ${CONFIG.particles.count}`;
+
+        console.log("🔨 World rebuilt:", {
+          walls: STATE.drumBodies.length,
+          baffles: STATE.baffleBodies.length,
+          particles: STATE.particleBodies.length,
+        });
+      }
+
+      /**
+       * Rotate drum and baffles
+       */
+      function rotateDrum(deltaAngle) {
+        const center = STATE.drumCenter;
+
+        // Rotate drum walls
+        STATE.drumBodies.forEach((wall) => {
+          const dx = wall.position.x - center.x;
+          const dy = wall.position.y - center.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const currentAngle = Math.atan2(dy, dx);
+          const newAngle = currentAngle + deltaAngle;
+
+          Body.setPosition(wall, {
+            x: center.x + Math.cos(newAngle) * dist,
+            y: center.y + Math.sin(newAngle) * dist,
+          });
+          Body.setAngle(wall, wall.angle + deltaAngle);
+        });
+
+        // Rotate baffles
+        STATE.baffleBodies.forEach((baffle) => {
+          const dx = baffle.position.x - center.x;
+          const dy = baffle.position.y - center.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const currentAngle = Math.atan2(dy, dx);
+          const newAngle = currentAngle + deltaAngle;
+
+          Body.setPosition(baffle, {
+            x: center.x + Math.cos(newAngle) * dist,
+            y: center.y + Math.sin(newAngle) * dist,
+          });
+          Body.setAngle(baffle, baffle.angle + deltaAngle);
+        });
+
+        STATE.drumAngle += deltaAngle;
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════════════
+       ██╗   ██╗██╗    ██╗   ██╗██████╗ ██████╗  █████╗ ████████╗███████╗
+       ██║   ██║██║    ██║   ██║██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔════╝
+       ██║   ██║██║    ██║   ██║██████╔╝██║  ██║███████║   ██║   █████╗  
+       ██║   ██║██║    ██║   ██║██╔═══╝ ██║  ██║██╔══██║   ██║   ██╔══╝  
+       ╚██████╔╝██║    ╚██████╔╝██║     ██████╔╝██║  ██║   ██║   ███████╗
+        ╚═════╝ ╚═╝     ╚═════╝ ╚═╝     ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝
+       ═══════════════════════════════════════════════════════════════════════════════ */
+
+      let metricsChart = null;
+
+      /**
+       * Initialize the metrics chart
+       */
+      function initChart() {
+        const ctx = document.getElementById("metrics-chart").getContext("2d");
+
+        metricsChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "종합",
+                data: [],
+                borderColor: "#FFD700",
+                backgroundColor: "rgba(255, 215, 0, 0.1)",
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+              },
+              {
+                label: "뒤집힘",
+                data: [],
+                borderColor: "#2196F3",
+                backgroundColor: "rgba(33, 150, 243, 0.1)",
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+              },
+              {
+                label: "혼합도",
+                data: [],
+                borderColor: "#4CAF50",
+                backgroundColor: "rgba(76, 175, 80, 0.1)",
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: {
+              intersect: false,
+              mode: "index",
+            },
+            scales: {
+              y: {
+                min: 0,
+                max: 100,
+                grid: { color: "rgba(255,255,255,0.05)" },
+                ticks: { color: "#718096", font: { size: 10 } },
+              },
+              x: {
+                display: false,
+                grid: { display: false },
+              },
+            },
+            plugins: {
+              legend: {
+                position: "top",
+                labels: {
+                  color: "#a0aec0",
+                  font: { size: 10 },
+                  boxWidth: 12,
+                  padding: 8,
+                },
+              },
+            },
+          },
+        });
+      }
+
+      /**
+       * Get grade information based on score
+       */
+      function getGrade(score) {
+        if (score >= 90)
+          return {
+            grade: "S",
+            label: "최적",
+            color: "#FFD700",
+            bgColor: "rgba(255, 215, 0, 0.2)",
+          };
+        if (score >= 80)
+          return {
+            grade: "A",
+            label: "우수",
+            color: "#4CAF50",
+            bgColor: "rgba(76, 175, 80, 0.2)",
+          };
+        if (score >= 70)
+          return {
+            grade: "B",
+            label: "양호",
+            color: "#8BC34A",
+            bgColor: "rgba(139, 195, 74, 0.2)",
+          };
+        if (score >= 60)
+          return {
+            grade: "C",
+            label: "보통",
+            color: "#FFC107",
+            bgColor: "rgba(255, 193, 7, 0.2)",
+          };
+        if (score >= 50)
+          return {
+            grade: "D",
+            label: "미흡",
+            color: "#FF9800",
+            bgColor: "rgba(255, 152, 0, 0.2)",
+          };
+        return {
+          grade: "F",
+          label: "부족",
+          color: "#F44336",
+          bgColor: "rgba(244, 67, 54, 0.2)",
+        };
+      }
+
+      /**
+       * Get flip rate status and suggestion
+       */
+      function getFlipStatus(rate) {
+        if (rate < 3)
+          return {
+            status: "정체",
+            color: "#666",
+            suggestion: "RPM 증가 또는 배플 수/길이 조정 권장",
+          };
+        if (rate < 8)
+          return {
+            status: "저조",
+            color: "#FFC107",
+            suggestion: "배플 각도 조정 또는 RPM 상향 검토",
+          };
+        if (rate <= 18)
+          return {
+            status: "최적",
+            color: "#4CAF50",
+            suggestion: "현재 설정 유지 권장",
+          };
+        if (rate <= 28)
+          return {
+            status: "활발",
+            color: "#2196F3",
+            suggestion: "양호 - 필요시 RPM 미세 조정",
+          };
+        return {
+          status: "과다",
+          color: "#F44336",
+          suggestion: "RPM 감소 또는 마찰 계수 증가 권장",
+        };
+      }
+
+      /**
+       * Update all UI displays with current metrics
+       */
+      function updateDisplay() {
+        const metrics = STATE.currentMetrics;
+        const elapsed = Math.floor((Date.now() - STATE.startTime) / 1000);
+
+        // Overall Score
+        document.getElementById("overall-score").textContent = metrics.overall;
+
+        // Score ring progress
+        const circumference = 2 * Math.PI * 56; // r=56 from SVG
+        const offset = circumference - (metrics.overall / 100) * circumference;
+        const scoreRing = document.getElementById("score-ring");
+        scoreRing.style.strokeDashoffset = offset;
+
+        // Update ring color based on score
+        const grade = getGrade(metrics.overall);
+        scoreRing.style.stroke = grade.color;
+
+        // Grade badge
+        const gradeBadge = document.getElementById("score-grade");
+        gradeBadge.textContent = `${grade.grade} - ${grade.label}`;
+        gradeBadge.style.background = grade.bgColor;
+        gradeBadge.style.color = grade.color;
+
+        // Flip status and suggestion
+        const flipStatus = getFlipStatus(metrics.flipRate);
+        document.getElementById("score-suggestion").textContent =
+          flipStatus.suggestion;
+
+        // Individual metrics
+        document.getElementById("metric-fliprate").textContent =
+          metrics.flipRate.toFixed(1);
+        document.getElementById("metric-mixing").textContent =
+          metrics.mixingIndex;
+        document.getElementById("metric-coverage").textContent =
+          metrics.coverage;
+        document.getElementById("metric-motion").textContent = metrics.motion;
+
+        // Metric bars
+        document.getElementById("bar-fliprate").style.width = `${Math.min(
+          100,
+          metrics.flipRate * 5
+        )}%`;
+        document.getElementById(
+          "bar-mixing"
+        ).style.width = `${metrics.mixingIndex}%`;
+        document.getElementById(
+          "bar-coverage"
+        ).style.width = `${metrics.coverage}%`;
+        document.getElementById(
+          "bar-motion"
+        ).style.width = `${metrics.motion}%`;
+
+        // Flip status indicator
+        const statusEl = document.getElementById("status-fliprate");
+        statusEl.innerHTML = `
+            <span class="status-dot" style="background: ${flipStatus.color};"></span>
+            <span>${flipStatus.status}</span>
+        `;
+
+        // Time displays
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById(
+          "badge-time"
+        ).textContent = `⏱️ ${minutes}:${String(seconds).padStart(2, "0")}`;
+        document.getElementById(
+          "chart-elapsed"
+        ).textContent = `${elapsed}초 경과`;
+
+        // Update chart
+        if (metricsChart) {
+          metricsChart.data.labels.push(elapsed);
+          metricsChart.data.datasets[0].data.push(metrics.overall);
+          metricsChart.data.datasets[1].data.push(metrics.flipScore);
+          metricsChart.data.datasets[2].data.push(metrics.mixingIndex);
+
+          // Keep only recent data
+          const maxPoints = CONFIG.metrics.historyLength;
+          if (metricsChart.data.labels.length > maxPoints) {
+            metricsChart.data.labels.shift();
+            metricsChart.data.datasets.forEach((ds) => ds.data.shift());
+          }
+
+          metricsChart.update("none");
+        }
+
+        // Store history for export
+        STATE.metricsHistory.push({
+          time: elapsed,
+          ...metrics,
+        });
+
+        // Trim history
+        if (STATE.metricsHistory.length > 1000) {
+          STATE.metricsHistory = STATE.metricsHistory.slice(-500);
+        }
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════════════
+        ██████╗ ██████╗ ███╗   ██╗████████╗██████╗  ██████╗ ██╗     ███████╗
+       ██╔════╝██╔═══██╗████╗  ██║╚══██╔══╝██╔══██╗██╔═══██╗██║     ██╔════╝
+       ██║     ██║   ██║██╔██╗ ██║   ██║   ██████╔╝██║   ██║██║     ███████╗
+       ██║     ██║   ██║██║╚██╗██║   ██║   ██╔══██╗██║   ██║██║     ╚════██║
+       ╚██████╗╚██████╔╝██║ ╚████║   ██║   ██║  ██║╚██████╔╝███████╗███████║
+        ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚══════╝
+       ═══════════════════════════════════════════════════════════════════════════════ */
+
+      /**
+       * Bind a slider control to config and display
+       */
+      function bindSlider(
+        sliderId,
+        valueId,
+        formatter,
+        configPath,
+        needsRebuild = false
+      ) {
+        const slider = document.getElementById(sliderId);
+        const valueEl = document.getElementById(valueId);
+
+        slider.addEventListener("input", () => {
+          const value = parseFloat(slider.value);
+          valueEl.textContent = formatter(value);
+
+          // Update config
+          const path = configPath.split(".");
+          let obj = CONFIG;
+          for (let i = 0; i < path.length - 1; i++) {
+            obj = obj[path[i]];
+          }
+          obj[path[path.length - 1]] = value;
+
+          // Apply immediately if no rebuild needed
+          if (!needsRebuild) {
+            applyLiveChanges();
+          }
+        });
+      }
+
+      /**
+       * Apply changes that don't require world rebuild
+       */
+      function applyLiveChanges() {
+        // Update gravity
+        if (STATE.engine) {
+          STATE.engine.gravity.y = CONFIG.environment.gravity;
+        }
+
+        // Update time scale
+        if (STATE.engine) {
+          STATE.engine.timing.timeScale = CONFIG.environment.timeScale;
+        }
+
+        // Update particle properties
+        STATE.particleBodies.forEach((p) => {
+          p.friction = CONFIG.particles.friction;
+          p.frictionStatic = CONFIG.particles.frictionStatic;
+          p.restitution = CONFIG.particles.restitution;
+        });
+      }
+
+      /**
+       * Initialize all control bindings
+       */
+      function initControls() {
+        // Drum controls
+        bindSlider(
+          "ctrl-drum-radius",
+          "val-drum-radius",
+          (v) => `${v}px`,
+          "drum.radius",
+          true
+        );
+        bindSlider(
+          "ctrl-drum-rpm",
+          "val-drum-rpm",
+          (v) => `${v} RPM`,
+          "drum.rpm",
+          false
+        );
+
+        // Baffle controls
+        bindSlider(
+          "ctrl-baffle-count",
+          "val-baffle-count",
+          (v) => `${v}개`,
+          "baffles.count",
+          true
+        );
+        bindSlider(
+          "ctrl-baffle-length",
+          "val-baffle-length",
+          (v) => `${v}px`,
+          "baffles.length",
+          true
+        );
+        bindSlider(
+          "ctrl-baffle-tilt",
+          "val-baffle-tilt",
+          (v) => `${v}°`,
+          "baffles.tilt",
+          true
+        );
+
+        // Baffle pattern dropdown
+        document
+          .getElementById("ctrl-baffle-pattern")
+          .addEventListener("change", (e) => {
+            CONFIG.baffles.pattern = e.target.value;
+          });
+
+        // Particle controls
+        bindSlider(
+          "ctrl-particle-count",
+          "val-particle-count",
+          (v) => `${v}개`,
+          "particles.count",
+          true
+        );
+        bindSlider(
+          "ctrl-particle-size",
+          "val-particle-size",
+          (v) => `${v}px`,
+          "particles.size",
+          true
+        );
+        bindSlider(
+          "ctrl-friction",
+          "val-friction",
+          (v) => (v / 100).toFixed(2),
+          "particles.friction",
+          false
+        );
+        bindSlider(
+          "ctrl-restitution",
+          "val-restitution",
+          (v) => (v / 100).toFixed(2),
+          "particles.restitution",
+          false
+        );
+
+        // Environment controls
+        bindSlider(
+          "ctrl-gravity",
+          "val-gravity",
+          (v) => `${(v / 100).toFixed(1)}g`,
+          "environment.gravity",
+          false
+        );
+        bindSlider(
+          "ctrl-timescale",
+          "val-timescale",
+          (v) => `${(v / 100).toFixed(1)}x`,
+          "environment.timeScale",
+          false
+        );
+
+        // Update friction config properly (slider is 0-100, config is 0-1)
+        document
+          .getElementById("ctrl-friction")
+          .addEventListener("input", (e) => {
+            CONFIG.particles.friction = parseFloat(e.target.value) / 100;
+            CONFIG.particles.frictionStatic = CONFIG.particles.friction * 1.5;
+            applyLiveChanges();
+          });
+
+        document
+          .getElementById("ctrl-restitution")
+          .addEventListener("input", (e) => {
+            CONFIG.particles.restitution = parseFloat(e.target.value) / 100;
+            applyLiveChanges();
+          });
+
+        document
+          .getElementById("ctrl-gravity")
+          .addEventListener("input", (e) => {
+            CONFIG.environment.gravity = parseFloat(e.target.value) / 100;
+            applyLiveChanges();
+          });
+
+        document
+          .getElementById("ctrl-timescale")
+          .addEventListener("input", (e) => {
+            CONFIG.environment.timeScale = parseFloat(e.target.value) / 100;
+            applyLiveChanges();
+          });
+
+        // Button controls
+        document.getElementById("btn-rebuild").addEventListener("click", () => {
+          buildWorld();
+        });
+
+        document.getElementById("btn-reset").addEventListener("click", () => {
+          STATE.startTime = Date.now();
+          STATE.metricsHistory = [];
+          FlipTracker.reset();
+          FlipTracker.init(STATE.particleBodies);
+
+          // Reset chart
+          if (metricsChart) {
+            metricsChart.data.labels = [];
+            metricsChart.data.datasets.forEach((ds) => (ds.data = []));
+            metricsChart.update();
+          }
+        });
+
+        document
+          .getElementById("btn-randomize")
+          .addEventListener("click", () => {
+            // Randomize settings
+            document.getElementById("ctrl-baffle-count").value =
+              Math.floor(Math.random() * 10) + 2;
+            document.getElementById("ctrl-baffle-length").value =
+              Math.floor(Math.random() * 60) + 30;
+            document.getElementById("ctrl-baffle-tilt").value =
+              Math.floor(Math.random() * 60) - 30;
+            document.getElementById("ctrl-drum-rpm").value =
+              Math.floor(Math.random() * 35) + 5;
+
+            // Update config
+            CONFIG.baffles.count = parseInt(
+              document.getElementById("ctrl-baffle-count").value
+            );
+            CONFIG.baffles.length = parseInt(
+              document.getElementById("ctrl-baffle-length").value
+            );
+            CONFIG.baffles.tilt = parseInt(
+              document.getElementById("ctrl-baffle-tilt").value
+            );
+            CONFIG.drum.rpm = parseInt(
+              document.getElementById("ctrl-drum-rpm").value
+            );
+
+            // Update displays
+            document.getElementById(
+              "val-baffle-count"
+            ).textContent = `${CONFIG.baffles.count}개`;
+            document.getElementById(
+              "val-baffle-length"
+            ).textContent = `${CONFIG.baffles.length}px`;
+            document.getElementById(
+              "val-baffle-tilt"
+            ).textContent = `${CONFIG.baffles.tilt}°`;
+            document.getElementById(
+              "val-drum-rpm"
+            ).textContent = `${CONFIG.drum.rpm} RPM`;
+
+            // Random pattern
+            const patterns = ["uniform", "alternating", "clustered"];
+            CONFIG.baffles.pattern =
+              patterns[Math.floor(Math.random() * patterns.length)];
+            document.getElementById("ctrl-baffle-pattern").value =
+              CONFIG.baffles.pattern;
+
+            buildWorld();
+          });
+
+        document
+          .getElementById("btn-pause")
+          .addEventListener("click", function () {
+            STATE.isPaused = !STATE.isPaused;
+            this.textContent = STATE.isPaused ? "▶️ 재생" : "⏸️ 일시정지";
+            this.classList.toggle("btn-success", STATE.isPaused);
+            this.classList.toggle("btn-danger", !STATE.isPaused);
+          });
+
+        // Export controls
+        document
+          .getElementById("btn-export-csv")
+          .addEventListener("click", exportCSV);
+        document
+          .getElementById("btn-save-preset")
+          .addEventListener("click", savePreset);
+        document
+          .getElementById("btn-load-preset")
+          .addEventListener("click", () => {
+            document.getElementById("preset-file-input").click();
+          });
+        document
+          .getElementById("preset-file-input")
+          .addEventListener("change", loadPreset);
+
+        // Help modal controls
+        const helpModal = document.getElementById("help-modal");
+        document.getElementById("btn-help").addEventListener("click", () => {
+          helpModal.classList.add("active");
+        });
+        document
+          .getElementById("btn-close-modal")
+          .addEventListener("click", () => {
+            helpModal.classList.remove("active");
+          });
+        helpModal.addEventListener("click", (e) => {
+          if (e.target === helpModal) {
+            helpModal.classList.remove("active");
+          }
+        });
+        // Close modal with Escape key
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && helpModal.classList.contains("active")) {
+            helpModal.classList.remove("active");
+          }
+        });
+      }
+
+      /**
+       * Export metrics history as CSV
+       */
+      function exportCSV() {
+        if (STATE.metricsHistory.length === 0) {
+          alert("내보낼 데이터가 없습니다. 잠시 시뮬레이션을 실행해주세요.");
+          return;
+        }
+
+        let csv =
+          "Time(s),Overall,FlipScore,FlipRate,MixingIndex,Coverage,Motion\n";
+
+        STATE.metricsHistory.forEach((m) => {
+          csv += `${m.time},${m.overall},${m.flipScore},${m.flipRate},${m.mixingIndex},${m.coverage},${m.motion}\n`;
+        });
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `drum_sim_${new Date()
+          .toISOString()
+          .slice(0, 19)
+          .replace(/:/g, "-")}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      /**
+       * Save current configuration as JSON preset
+       */
+      function savePreset() {
+        const preset = {
+          version: "1.0",
+          timestamp: new Date().toISOString(),
+          config: JSON.parse(JSON.stringify(CONFIG)),
+        };
+
+        const blob = new Blob([JSON.stringify(preset, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `preset_${new Date()
+          .toISOString()
+          .slice(0, 19)
+          .replace(/:/g, "-")}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      /**
+       * Load configuration from JSON preset file
+       */
+      function loadPreset(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const preset = JSON.parse(event.target.result);
+
+            if (!preset.config) {
+              throw new Error("Invalid preset format");
+            }
+
+            // Apply loaded config
+            Object.assign(CONFIG.drum, preset.config.drum || {});
+            Object.assign(CONFIG.baffles, preset.config.baffles || {});
+            Object.assign(CONFIG.particles, preset.config.particles || {});
+            Object.assign(CONFIG.environment, preset.config.environment || {});
+
+            // Update UI controls
+            document.getElementById("ctrl-drum-radius").value =
+              CONFIG.drum.radius;
+            document.getElementById(
+              "val-drum-radius"
+            ).textContent = `${CONFIG.drum.radius}px`;
+
+            document.getElementById("ctrl-drum-rpm").value = CONFIG.drum.rpm;
+            document.getElementById(
+              "val-drum-rpm"
+            ).textContent = `${CONFIG.drum.rpm} RPM`;
+
+            document.getElementById("ctrl-baffle-count").value =
+              CONFIG.baffles.count;
+            document.getElementById(
+              "val-baffle-count"
+            ).textContent = `${CONFIG.baffles.count}개`;
+
+            document.getElementById("ctrl-baffle-length").value =
+              CONFIG.baffles.length;
+            document.getElementById(
+              "val-baffle-length"
+            ).textContent = `${CONFIG.baffles.length}px`;
+
+            document.getElementById("ctrl-baffle-tilt").value =
+              CONFIG.baffles.tilt;
+            document.getElementById(
+              "val-baffle-tilt"
+            ).textContent = `${CONFIG.baffles.tilt}°`;
+
+            document.getElementById("ctrl-baffle-pattern").value =
+              CONFIG.baffles.pattern;
+
+            document.getElementById("ctrl-particle-count").value =
+              CONFIG.particles.count;
+            document.getElementById(
+              "val-particle-count"
+            ).textContent = `${CONFIG.particles.count}개`;
+
+            document.getElementById("ctrl-particle-size").value =
+              CONFIG.particles.size;
+            document.getElementById(
+              "val-particle-size"
+            ).textContent = `${CONFIG.particles.size}px`;
+
+            document.getElementById("ctrl-friction").value =
+              CONFIG.particles.friction * 100;
+            document.getElementById("val-friction").textContent =
+              CONFIG.particles.friction.toFixed(2);
+
+            document.getElementById("ctrl-restitution").value =
+              CONFIG.particles.restitution * 100;
+            document.getElementById("val-restitution").textContent =
+              CONFIG.particles.restitution.toFixed(2);
+
+            document.getElementById("ctrl-gravity").value =
+              CONFIG.environment.gravity * 100;
+            document.getElementById(
+              "val-gravity"
+            ).textContent = `${CONFIG.environment.gravity.toFixed(1)}g`;
+
+            document.getElementById("ctrl-timescale").value =
+              CONFIG.environment.timeScale * 100;
+            document.getElementById(
+              "val-timescale"
+            ).textContent = `${CONFIG.environment.timeScale.toFixed(1)}x`;
+
+            // Rebuild world with new settings
+            buildWorld();
+
+            console.log("📂 Preset loaded:", preset.timestamp);
+          } catch (err) {
+            alert("프리셋 파일을 읽을 수 없습니다: " + err.message);
+          }
+        };
+        reader.readAsText(file);
+
+        // Reset file input
+        e.target.value = "";
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════════════
+        ██████╗  █████╗ ███╗   ███╗███████╗    ██╗      ██████╗  ██████╗ ██████╗ 
+       ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██║     ██╔═══██╗██╔═══██╗██╔══██╗
+       ██║  ███╗███████║██╔████╔██║█████╗      ██║     ██║   ██║██║   ██║██████╔╝
+       ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║     ██║   ██║██║   ██║██╔═══╝ 
+       ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ███████╗╚██████╔╝╚██████╔╝██║     
+        ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝    ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     
+       ═══════════════════════════════════════════════════════════════════════════════ */
+
+      let lastFpsTime = 0;
+      let frameCount = 0;
+
+      /**
+       * Main game loop
+       */
+      function gameLoop(timestamp) {
+        if (!STATE.isPaused) {
+          // Calculate drum rotation for this frame
+          // RPM to radians per frame (assuming ~60fps)
+          const angularVelocity = (CONFIG.drum.rpm * 2 * Math.PI) / 60 / 60;
+          rotateDrum(angularVelocity * CONFIG.environment.timeScale);
+
+          // Update flip tracker
+          FlipTracker.update(STATE.particleBodies, Date.now());
+
+          // Update metrics periodically
+          const now = Date.now();
+          if (now - STATE.lastMetricUpdate >= CONFIG.metrics.updateInterval) {
+            STATE.currentMetrics = calculateAllMetrics();
+            updateDisplay();
+            STATE.lastMetricUpdate = now;
+          }
+        }
+
+        // FPS counter
+        frameCount++;
+        if (timestamp - lastFpsTime >= 1000) {
+          const fps = frameCount;
+          document.getElementById("badge-fps").textContent = `FPS: ${fps}`;
+          document.getElementById("badge-fps").style.color =
+            fps >= 30 ? "#81C784" : fps >= 20 ? "#FFC107" : "#F44336";
+          frameCount = 0;
+          lastFpsTime = timestamp;
+        }
+
+        requestAnimationFrame(gameLoop);
+      }
+
+      /**
+       * Draw orientation indicators on particles to visualize rotation
+       */
+      function drawParticleOrientations() {
+        if (!STATE.render || !STATE.render.context) return;
+
+        const ctx = STATE.render.context;
+
+        STATE.particleBodies.forEach((p) => {
+          const { x, y } = p.position;
+          const angle = p.angle;
+
+          // Get the approximate size from vertices
+          const vertices = p.vertices;
+          let minX = Infinity,
+            maxX = -Infinity,
+            minY = Infinity,
+            maxY = -Infinity;
+          vertices.forEach((v) => {
+            minX = Math.min(minX, v.x);
+            maxX = Math.max(maxX, v.x);
+            minY = Math.min(minY, v.y);
+            maxY = Math.max(maxY, v.y);
+          });
+          const width = maxX - minX;
+          const height = maxY - minY;
+          const size = Math.min(width, height) * 0.35;
+
+          // Draw orientation line
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(angle);
+
+          // Draw a stripe/line to show orientation
+          ctx.beginPath();
+          ctx.moveTo(-size, -size * 0.3);
+          ctx.lineTo(size, -size * 0.3);
+          ctx.lineTo(size, size * 0.3);
+          ctx.lineTo(-size, size * 0.3);
+          ctx.closePath();
+
+          // Use contrasting color based on group
+          const isGroupA = p.label === "groupA";
+          ctx.fillStyle = isGroupA
+            ? "rgba(180, 40, 40, 0.7)"
+            : "rgba(30, 120, 110, 0.7)";
+          ctx.fill();
+
+          // Add a small dot at one end to show direction
+          ctx.beginPath();
+          ctx.arc(size * 0.6, 0, size * 0.25, 0, Math.PI * 2);
+          ctx.fillStyle = isGroupA ? "#FFD700" : "#FFFFFF";
+          ctx.fill();
+
+          ctx.restore();
+        });
+      }
+
+      /* ═══════════════════════════════════════════════════════════════════════════════
+       ██╗███╗   ██╗██╗████████╗██╗ █████╗ ██╗     ██╗███████╗ █████╗ ████████╗██╗ ██████╗ ███╗   ██╗
+       ██║████╗  ██║██║╚══██╔══╝██║██╔══██╗██║     ██║╚══███╔╝██╔══██╗╚══██╔══╝██║██╔═══██╗████╗  ██║
+       ██║██╔██╗ ██║██║   ██║   ██║███████║██║     ██║  ███╔╝ ███████║   ██║   ██║██║   ██║██╔██╗ ██║
+       ██║██║╚██╗██║██║   ██║   ██║██╔══██║██║     ██║ ███╔╝  ██╔══██║   ██║   ██║██║   ██║██║╚██╗██║
+       ██║██║ ╚████║██║   ██║   ██║██║  ██║███████╗██║███████╗██║  ██║   ██║   ██║╚██████╔╝██║ ╚████║
+       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   ╚═╝╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
+       ═══════════════════════════════════════════════════════════════════════════════ */
+
+      /**
+       * Initialize the simulation
+       */
+      function init() {
+        console.log("🥁 Initializing Drum Mixing Simulator...");
+
+        const canvas = document.getElementById("simulation-canvas");
+        const container = document.getElementById("canvas-wrapper");
+
+        // Calculate canvas size
+        const width = container.clientWidth - 32;
+        const height = container.clientHeight - 32;
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Set drum center
+        STATE.drumCenter = {
+          x: width / 2,
+          y: height / 2,
+        };
+
+        // Adjust drum radius if needed
+        const maxRadius = Math.min(width, height) / 2 - 30;
+        if (CONFIG.drum.radius > maxRadius) {
+          CONFIG.drum.radius = maxRadius;
+          document.getElementById("ctrl-drum-radius").value = maxRadius;
+          document.getElementById("ctrl-drum-radius").max = maxRadius;
+          document.getElementById(
+            "val-drum-radius"
+          ).textContent = `${maxRadius}px`;
+        }
+
+        // Create physics engine
+        STATE.engine = Engine.create({
+          gravity: { x: 0, y: CONFIG.environment.gravity },
+          positionIterations: 8,
+          velocityIterations: 8,
+        });
+
+        // Create renderer
+        STATE.render = Render.create({
+          canvas: canvas,
+          engine: STATE.engine,
+          options: {
+            width: width,
+            height: height,
+            wireframes: false,
+            background: "#0a0a1a",
+            pixelRatio: window.devicePixelRatio || 1,
+          },
+        });
+
+        // Create runner
+        STATE.runner = Runner.create();
+        Runner.run(STATE.runner, STATE.engine);
+        Render.run(STATE.render);
+
+        // Register custom drawing for particle orientations
+        Events.on(STATE.render, "afterRender", drawParticleOrientations);
+
+        // Build initial world
+        buildWorld();
+
+        // Initialize chart
+        initChart();
+
+        // Initialize controls
+        initControls();
+
+        // Start game loop
+        requestAnimationFrame(gameLoop);
+
+        console.log("✅ Simulator initialized successfully!");
+      }
+
+      /**
+       * Handle window resize
+       */
+      function handleResize() {
+        const container = document.getElementById("canvas-wrapper");
+        const canvas = document.getElementById("simulation-canvas");
+
+        const width = container.clientWidth - 32;
+        const height = container.clientHeight - 32;
+
+        canvas.width = width;
+        canvas.height = height;
+
+        STATE.drumCenter = {
+          x: width / 2,
+          y: height / 2,
+        };
+
+        if (STATE.render) {
+          STATE.render.options.width = width;
+          STATE.render.options.height = height;
+          STATE.render.canvas.width = width;
+          STATE.render.canvas.height = height;
+        }
+
+        // Rebuild world with new center
+        buildWorld();
+      }
+
+      // Initialize when DOM is ready
+      window.addEventListener("DOMContentLoaded", init);
+
+      // Handle resize with debounce
+      let resizeTimeout;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(handleResize, 250);
+      });
+    </script>
+  </body>
+</html>
